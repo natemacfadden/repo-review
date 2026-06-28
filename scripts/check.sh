@@ -46,8 +46,8 @@ done
 # async function - top-level await/return legal). see scripts/checks.
 section "workflow syntax"
 if command -v node >/dev/null 2>&1; then
-  WF=plugins/repo-review/workflows
-  if node scripts/checks/workflow-syntax.mjs "$WF"/*.js; then
+  WF=plugins/repo-review/lib/repo-review.js
+  if node scripts/checks/workflow-syntax.mjs "$WF"; then
     ok "workflow syntax"
   else
     bad "workflow syntax"
@@ -59,7 +59,7 @@ fi
 # 5. workflow meta validity (required fields, pure literal, phase() matching)
 section "meta"
 if command -v node >/dev/null 2>&1; then
-  if node scripts/checks/meta.mjs plugins/repo-review/workflows/*.js; then
+  if node scripts/checks/meta.mjs plugins/repo-review/lib/repo-review.js; then
     ok meta
   else
     bad meta

@@ -79,9 +79,19 @@ repo-review/                       <- this repo doubles as a marketplace
 └── plugins/
     └── repo-review/               <- the plugin
         ├── .claude-plugin/plugin.json
-        ├── commands/repo-review.md    <- entry point; invokes the workflow
-        └── workflows/repo-review.js   <- the workflow (CORE lenses + PROFILE)
+        ├── commands/review.md         <- entry point; invokes the workflow
+        └── lib/repo-review.js         <- the workflow engine (lenses + PROFILE)
 ```
+
+> **Why `lib/` and not `workflows/`?** Sorry, this is a deliberate misnomer.
+> `lib/repo-review.js` is a workflow, and would normally live in `workflows/`.
+> But Claude Code auto-registers any workflow under `workflows/` as its own
+> invokable `/repo-review:repo-review` skill, which duplicated the real entry
+> point and would let users bypass the command's setup. Parking it in `lib/`
+> (a non-auto-scanned directory) keeps a single clean entry point,
+> `/repo-review:review`, which loads the engine by explicit path. See the
+> open question filed with Claude Code about a first-class way to mark a
+> workflow internal.
 
 ## Development
 

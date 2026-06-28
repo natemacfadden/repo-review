@@ -71,7 +71,7 @@ path and keep the quotes in case it contains spaces:
 
 ```
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/repo-review.js",
+  scriptPath: "${CLAUDE_PLUGIN_ROOT}/lib/repo-review.js",
   args: "$ARGUMENTS --out \"<pwd>/repo-review-out\""
 })
 ```
@@ -81,7 +81,7 @@ programmatically can skip the string entirely (pass `outDir` directly):
 
 ```
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/repo-review.js",
+  scriptPath: "${CLAUDE_PLUGIN_ROOT}/lib/repo-review.js",
   args: {
     repos: [{ path: "./a", flavor: "performance" }, { path: "./b" }],
     profile: "job",

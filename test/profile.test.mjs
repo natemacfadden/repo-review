@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { loadPure } from './extract.mjs'
 
-const WF = 'plugins/repo-review/workflows/repo-review.js'
+const WF = 'plugins/repo-review/lib/repo-review.js'
 const { resolveProfile } = loadPure(WF, ['resolveProfile'])
 
 test('resolveProfile: null/empty -> general default', () => {
