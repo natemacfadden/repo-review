@@ -36,6 +36,25 @@ For the full options reference - profiles, flavors, `--for`, `--out` - run:
 (The command is `/repo-review:review`: Claude Code namespaces plugin commands
 as `/<plugin>:<command>`.)
 
+## Update
+
+To pick up a newer pushed version, refresh the marketplace clone (a plain
+reinstall is not enough - it reuses the cached clone), then reload:
+
+```
+/plugin marketplace update repo-review
+/reload-plugins
+```
+
+If a renamed or removed command lingers afterward, do a clean reinstall:
+
+```
+/plugin uninstall repo-review@repo-review
+/plugin marketplace update repo-review
+/plugin install repo-review@repo-review
+/reload-plugins
+```
+
 ## Uninstall
 
 Run as slash commands inside a Claude Code session:
