@@ -59,6 +59,18 @@ else
   skip "workflow syntax (node not found - activate the conda env)"
 fi
 
+# 5. workflow meta validity (required fields, pure literal, phase() matching)
+section "meta"
+if command -v node >/dev/null 2>&1; then
+  if node scripts/checks/meta.mjs plugins/repo-review/workflows/*.js; then
+    ok meta
+  else
+    bad meta
+  fi
+else
+  skip "meta (node not found - activate the conda env)"
+fi
+
 # 5. plugin + marketplace manifest structure
 section "plugin validate"
 if command -v claude >/dev/null 2>&1; then
@@ -69,6 +81,16 @@ if command -v claude >/dev/null 2>&1; then
   fi
 else
   skip "plugin validate (claude CLI not found)"
+fi
+
+# 7. unit tests (node's built-in runner; skipped until tests exist)
+section "tests"
+if ! command -v node >/dev/null 2>&1; then
+  skip "tests (node not found - activate the conda env)"
+elif [ -n "$(find test -name '*.test.mjs' 2>/dev/null)" ]; then
+  if node --test; then ok tests; else bad tests; fi
+else
+  skip "tests (none yet)"
 fi
 
 # summary

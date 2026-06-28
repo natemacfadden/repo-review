@@ -4,7 +4,8 @@
   "private": true,
   "description": "Dev/CI tooling for the repo-review Claude Code plugin",
   "scripts": {
-    "check": "bash scripts/check.sh"
+    "check": "bash scripts/check.sh",
+    "test": "node --test"
   },
   "devDependencies": {
     "editorconfig-checker": ">=5"

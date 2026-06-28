@@ -68,6 +68,13 @@ Run all checks (the same entry point CI runs):
 bash scripts/check.sh                 # or: npm run check
 ```
 
-It runs the ascii, editorconfig, JSON-manifest, workflow-syntax, and
-`claude plugin validate --strict` checks, collecting every failure before
-exiting non-zero. Tools that aren't installed are skipped, not failed.
+It runs ascii, editorconfig, JSON-manifest, workflow-syntax, meta-validity, and
+`claude plugin validate --strict` checks, plus the unit-test suite, collecting
+every failure before exiting non-zero. Tools that aren't installed (and the
+tests, until they exist) are skipped, not failed.
+
+Run just the unit tests during development:
+
+```
+npm test
+```

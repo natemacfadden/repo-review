@@ -9,7 +9,7 @@ indent_style = space
 indent_size = 2
 
 # code and prose hard-wrap at 88
-[*.{js,md}]
+[*.{js,mjs,md}]
 max_line_length = 88
 
 # json/yaml description values are single, unwrappable strings - no length cap
