@@ -1,2 +1,5 @@
 # JS dev tooling (layer 2); never a runtime dependency
 node_modules/
+
+# review output written by the workflow at runtime (not source)
+repo-review-out/

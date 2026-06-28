@@ -30,8 +30,14 @@ for (const file of process.argv.slice(2)) {
 
   if (!/\bname\s*:/.test(block)) fail(file, 'meta.name missing')
   if (!/\bdescription\s*:/.test(block)) fail(file, 'meta.description missing')
-  if (/`/.test(block) || /\$\{/.test(block))
-    fail(file, 'meta must be a pure literal (no template strings)')
+  // pure-literal check: strip string contents, then any remaining + (concat),
+  // backtick (template), or ( (call) means meta is not a pure literal - which
+  // the workflow runtime rejects.
+  const stripped = block
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+  if (/[+`(]/.test(stripped))
+    fail(file, 'meta must be a pure literal (no concat/template/calls)')
 
   const declared = new Set(
     [...block.matchAll(/title\s*:\s*['"]([^'"]+)['"]/g)].map(x => x[1]),

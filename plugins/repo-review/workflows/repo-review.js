@@ -6,13 +6,9 @@
 export const meta = {
   name: 'repo-review',
   description:
-    'Clone, build, and run a repo, then review it across five lenses ' +
-    '(performance, correctness, engineering, taste & positioning, docs) and ' +
-    'synthesize a scored review under a selectable profile.',
+    'Clone, build, run, and review repos across five lenses; synthesize.',
   whenToUse:
-    'Evaluate a code repo by actually standing it up and running it. Pass ' +
-    'args = { repoPath, profile?, ...overrides } or a bare repo-path string. ' +
-    'Default profile is a general code-quality review.',
+    'Stand repos up and review them; pass repo paths (optionally path:flavor).',
   phases: [
     { title: 'Detect', detail: 'per-repo flavor detection (when not given)' },
     { title: 'Reviews', detail: 'five lens reviewers per repo, one at a time' },
@@ -337,7 +333,8 @@ const DETECT_SCHEMA = {
 function buildReviewSchema(profile) {
   return {
     type: 'object',
-    required: ['reviewedCommit', 'scores', 'recommendation', 'review'],
+    required: ['reviewedCommit', 'scores', 'recommendation', 'reviewPath',
+      'summary'],
     properties: {
       reviewedCommit: { type: 'string', description: 'commit reviewed' },
       scores: { type: 'object', required: SCORE_AXES, properties: SCORE_PROPS },
@@ -347,7 +344,8 @@ function buildReviewSchema(profile) {
       weaknesses: { type: 'array', items: { type: 'string' } },
       testsWritten: { type: 'string', description: 'tests you wrote + results' },
       oversellAssessment: { type: 'string' },
-      review: { type: 'string', description: 'full per-lens review markdown' },
+      reviewPath: { type: 'string', description: 'path of the written review' },
+      summary: { type: 'string', description: 'one-line summary' },
       cleanupConfirmed: { type: 'boolean' },
     },
   }
@@ -357,9 +355,10 @@ function buildSynthesisSchema(profile) {
   const strs = { type: 'array', items: { type: 'string' } }
   return {
     type: 'object',
-    required: ['memo', 'verdict', 'outliers'],
+    required: ['memoPath', 'summary', 'verdict', 'outliers'],
     properties: {
-      memo: { type: 'string', description: 'consolidated memo markdown doc' },
+      memoPath: { type: 'string', description: 'path of the written memo' },
+      summary: { type: 'string', description: 'short summary: verdict + why' },
       verdict: { type: 'string', enum: profile.verdicts },
       provenance: { type: 'string', description: 'commit(s) reviewed' },
       outliers: strs,
@@ -456,8 +455,10 @@ function reviewPrompt(repo, lens, profile, flavor) {
       'cleanup confirmation. This doc is the human-readable deliverable.',
     `CLEAN UP COMPLETELY: rm ${tmp} and remove anything installed ` +
       'system-wide; leave no trace. Confirm cleanup.',
-    'Return your result via the structured-output tool, populating every ' +
-      'field.',
+    `In your structured output, set reviewPath to ${outPath} and give a ` +
+      'ONE-LINE summary; populate scores, recommendation, and the other ' +
+      'fields. Do NOT return the full review text in the output - it lives ' +
+      'in the doc you wrote.',
   ].join('\n\n')
 }
 function synthesisPrompt(repo, profile, flavor, reviews, scores) {
@@ -519,8 +520,11 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores) {
       'disagreements; the oversell/undersell call; the Fixes section; and ' +
       'the final recommendation tied to the purpose. This memo is the ' +
       'human-readable deliverable.',
-    'Return your result via the structured-output tool, populating every ' +
-      'field.',
+    `In your structured output, set memoPath to ${memoPath} and give a ` +
+      'SHORT summary (2-4 sentences: the verdict and why); populate verdict, ' +
+      'provenance, outliers, disagreements, consensus lists, and fixes. Do ' +
+      'NOT return the full memo text in the output - it lives in the doc you ' +
+      'wrote.',
   ].join('\n\n')
 }
 
@@ -536,31 +540,51 @@ const synthesisSchema = buildSynthesisSchema(profile)
 log(`repo-review: ${repos.length} repo(s), profile ${profile.name}`)
 
 const results = []
+let n = 0
 for (const repo of repos) {
+  n++
+  const tag = `[${n}/${repos.length}] ${repo.path}`
+  log(`${tag}: starting`)
+
   // resolve flavor: detect only when not given inline
   let flavor = repo.flavor
   if (!flavor) {
+    log(`${tag}: detect - classifying flavor`)
     const d = await agent(detectPrompt(repo), {
       label: `detect:${repo.path}`, phase: 'Detect', schema: DETECT_SCHEMA,
     })
     flavor = (d && d.flavor) || null
+    log(`${tag}: detect done - flavor ${flavor || 'balanced'}`)
+  } else {
+    log(`${tag}: flavor ${flavor} (given)`)
   }
 
   // five lens reviewers, strictly one at a time
+  log(`${tag}: reviews - ${LENSES.length} lenses, one at a time`)
   const reviews = []
   for (const lens of LENSES) {
-    log(`review ${repo.path} :: ${lens.title}`)
+    log(`${tag}: review start - ${lens.title}`)
     const r = await agent(reviewPrompt(repo, lens, profile, flavor), {
       label: `review:${repo.path}:${lens.key}`,
       phase: 'Reviews', schema: reviewSchema,
     })
-    if (r) reviews.push({ ...r, lens: lens.key })
+    if (r) {
+      reviews.push({ ...r, lens: lens.key })
+      const ov = r.scores ? r.scores.overall : '?'
+      log(`${tag}: review done - ${lens.title}: overall ${ov}, ` +
+        `${r.recommendation} - ${r.summary || ''}`)
+    } else {
+      log(`${tag}: review FAILED - ${lens.title}`)
+    }
   }
 
   const scores = reconcileScores(reviews)
+  log(`${tag}: reconciled ${reviews.length}/${LENSES.length} - overall ` +
+    `${scores.reconciled.overall}`)
 
   // synthesis narrates + identifies outliers + writes the memo; it does NOT
   // recompute the scores (those come from reconcileScores above)
+  log(`${tag}: synthesis - writing memo`)
   const synthesis = await agent(
     synthesisPrompt(repo, profile, flavor, reviews, scores),
     {
@@ -569,8 +593,25 @@ for (const repo of repos) {
       schema: synthesisSchema,
     },
   )
+  if (synthesis) {
+    const cs = (synthesis.consensusStrengths || []).length
+    const cw = (synthesis.consensusWeaknesses || []).length
+    const ol = (synthesis.outliers || []).length
+    log(`${tag}: VERDICT ${synthesis.verdict} (overall ` +
+      `${scores.reconciled.overall})\n  ${synthesis.summary || ''}\n  ` +
+      `consensus: +${cs} / -${cw}; ${ol} outliers; ` +
+      `memo -> ${synthesis.memoPath || '(unwritten)'}`)
+  } else {
+    log(`${tag}: synthesis FAILED`)
+  }
 
   results.push({ repo: repo.path, flavor, scores, synthesis })
+}
+
+log(`repo-review: finished ${results.length}/${repos.length} repo(s)`)
+for (const res of results) {
+  const v = res.synthesis ? res.synthesis.verdict : '(synthesis failed)'
+  log(`  ${res.repo}: ${v} (overall ${res.scores.reconciled.overall})`)
 }
 
 return { profile: profile.name, repos: results }
