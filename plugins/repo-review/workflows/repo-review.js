@@ -158,11 +158,75 @@ function reconcileScores(reviews) {
 
 // ---- lenses (CORE) -------------------------------------------------------
 const LENSES = [
-  { key: 'performance', title: 'Performance & benchmarking rigor' },
-  { key: 'correctness', title: 'Correctness & validity' },
-  { key: 'engineering', title: 'Engineering maturity' },
-  { key: 'taste', title: 'Taste & positioning' },
-  { key: 'documentation', title: 'Documentation & onboarding UX' },
+  {
+    key: 'performance',
+    title: 'Performance & benchmarking rigor',
+    focus:
+      'Is the work efficient for what it does? Actually profile the code ' +
+      'yourself (e.g. cProfile or pprofile for Python, or a profiler ' +
+      'appropriate to the stack) to locate hot spots - do not just trust ' +
+      'claims. Scrutinize benchmarking methodology: warmup, repeated ' +
+      'trials, variance/error bars, fixed and reported hardware, fair ' +
+      'baselines. Are performance claims backed by evidence or merely ' +
+      'asserted? Is there a credible baseline (naive impl or an established ' +
+      'library)? Does it scale (problem size, threads/cores, GPU if ' +
+      'claimed)? Where feasible, reproduce a headline number and report ' +
+      'what you measured.',
+  },
+  {
+    key: 'correctness',
+    title: 'Correctness & validity',
+    focus:
+      'Does the code actually compute what it claims? Look for validation ' +
+      'against analytic results, reference implementations, or known values. ' +
+      'Check numerical accuracy, stability, overflow, and edge cases. ' +
+      'Independently verify some outputs where feasible. Are there silent ' +
+      'correctness assumptions? Does the test suite exercise the hot paths ' +
+      'and the headline claims, or only trivial cases? Identify additional ' +
+      'ways the code could be tested or validated (properties, invariants, ' +
+      'reference cross-checks, harder inputs) and suggest them to the ' +
+      'reader.',
+  },
+  {
+    key: 'engineering',
+    title: 'Engineering maturity',
+    focus:
+      'Assess "shipped" quality: packaging/installability, dependency ' +
+      'pinning, versioning, error handling, typing, and CI (does it run ' +
+      'per-push/PR or not at all?). Test coverage of the important paths, ' +
+      'license consistency, and git-history legibility. Reproducibility: ' +
+      'seeds, deterministic configs, environment capture - can the headline ' +
+      'results be reproduced from the repo as shipped? The code should also ' +
+      'be readable and concise: flag long code that is not crucial to ' +
+      'function or performance and recommend removing it. Note ' +
+      'contradictions (license, version/tag drift, dead code).',
+  },
+  {
+    key: 'taste',
+    title: 'Taste & positioning',
+    focus:
+      'Is the problem worth solving, and is the work well-positioned? Is ' +
+      'prior art and existing tooling acknowledged, and is the work honest ' +
+      'about how it compares to real alternatives? Is the chosen approach ' +
+      'the right tool for the job? Is the scope well-judged (focused and ' +
+      'finished vs. sprawling or toy)? Penalize rebuilding a solved, ' +
+      'readily-available thing with no reason to. Does it show genuine ' +
+      'judgment and domain understanding?',
+  },
+  {
+    key: 'documentation',
+    title: 'Documentation & onboarding UX',
+    focus:
+      'Judge the README and docs as a cold drop-in newcomer. The README is ' +
+      'best when MINIMAL and laser-focused on getting a newcomer from zero ' +
+      'to running: what it is, installation, and a first working example. ' +
+      'Prefer a graphic or short demo (screenshot/gif) where it helps. ' +
+      'Reward low time-to-first-success and low friction; deeper API or ' +
+      'theory docs can live beyond the README. Beyond that focus, do not ' +
+      'nitpick formatting or favor a particular style - judge fitness for ' +
+      'the newcomer, not adherence to a format you prefer. (Calibration of ' +
+      'claims is scored separately on the honesty axis.)',
+  },
 ]
 
 // ---- schemas (TODO: flesh out fields) ------------------------------------
