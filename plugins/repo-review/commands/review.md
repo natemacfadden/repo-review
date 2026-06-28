@@ -1,15 +1,47 @@
 ---
 description: Clone, build, run, and review a repo across five lenses
-argument-hint: <repo-path[:flavor]>... [--profile <name>] [--for <text>]
+argument-hint: <repo-path[:flavor]>... [--profile <name>] [--for <text>] [--out <dir>]
 ---
 
 Review one or more code repositories by actually standing each up: clone,
 build, run a demo, then judge across five lenses (performance, correctness,
 engineering, taste & positioning, documentation) and synthesize a scored
-review. The **profile** (who is judging and how to grade; default general)
-applies to the whole run. Each repo's **flavor** (what it is for, tuning
-per-lens expectations) is resolved per repo: an explicit `path:flavor` if
-given, else auto-detected by a per-repo detection agent.
+review.
+
+## Usage
+
+```
+/repo-review:review <repo>[:flavor] [--profile <name>] [--for <text>] [--out <dir>]
+```
+
+- **`<repo>[:flavor]`** - one or more repo paths (batch). `:flavor` pins how a
+  repo is judged; omit it and the flavor is auto-detected. Flavors:
+  `performance`, `research`, `production`, `personal`.
+- **`--profile <name>`** - who is judging and the verdict scale, for the whole
+  run (default `general`):
+  - `general` - neutral senior-engineer code-quality review (Excellent/Good/Fair/Poor)
+  - `job` - hiring committee judging it as a portfolio piece (Strong Hire ... No-Hire)
+  - `oss-audit` - whether to adopt/depend on it (Adopt / Use with care / Avoid)
+  - `student-project` - instructor grading a learning project (A-F)
+- **`--for "<text>"`** - free-text specialization layered on the profile (quote
+  multi-word values). Examples:
+  - `--profile job --for "a Research Engineer role on a research team"`
+  - `--profile job --for "a senior frontend role at a design-led startup"`
+  - `--profile oss-audit --for "using this as a core production dependency"`
+- **`--out <dir>`** - absolute base for the output docs (default
+  `<invocation-dir>/repo-review-out`); each repo writes
+  `<out>/<repo>/{<lens>.md, MEMO.md}`.
+
+Examples:
+
+```
+/repo-review:review ./my-lib
+/repo-review:review ./api:performance ./ui --profile job --for "a full-stack role"
+/repo-review:review ~/code/foo --profile oss-audit --out ~/reviews
+```
+
+**If `$ARGUMENTS` is `--help` or `-h` (or no repo path is given), print the
+Usage section above and STOP - do not start a review.**
 
 ## Cost & expectations
 
@@ -26,10 +58,7 @@ The cost is dominated by the per-lens code-running review itself, not by waste
 - it is the price of the depth. Prefer overnight runs for multi-repo batches.
 
 Pass `$ARGUMENTS` through to the workflow unchanged - it parses the tokens
-itself (each non-flag token is a repo, optionally `path:flavor` for known
-flavors performance/research/production/personal; `--profile <name>` sets the
-run profile; `--for "<text>"` adds free-text specialization, e.g. a target
-company/role). Do not pre-parse.
+itself (see Usage above). Do not pre-parse the repos or flags yourself.
 
 ## Run
 

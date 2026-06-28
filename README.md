@@ -24,19 +24,17 @@ Run these as slash commands inside a Claude Code session (not a shell):
 `/reload-plugins` activates it in the current session without a restart. Then:
 
 ```
-/repo-review <repo-path>[:flavor]... [--profile <name>] [--for "<text>"]
+/repo-review:review <repo-path>[:flavor]...
 ```
 
-- `<repo-path>[:flavor]...` - one or more repos (batch); attach `:flavor` to
-  set that repo's flavor explicitly
-- `--profile <name>` - audience and verdict framing for the whole run
-  (default: general)
-- `--for "<text>"` - free-text specialization of the profile, e.g. a target
-  company or role (quote multi-word values)
+For the full options reference - profiles, flavors, `--for`, `--out` - run:
 
-Flavor (what the repo is for - tunes per-lens expectations) is resolved per
-repo: an explicit `:flavor` if given, else auto-detected from the repo. Values:
-`performance`, `research`, `production`, `personal`.
+```
+/repo-review:review --help
+```
+
+(The command is `/repo-review:review`: Claude Code namespaces plugin commands
+as `/<plugin>:<command>`.)
 
 ## Uninstall
 
