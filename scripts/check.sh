@@ -32,8 +32,9 @@ fi
 # 3. json manifests parse
 section "json"
 json_ok=1
-for f in .claude-plugin/marketplace.json \
-         plugins/repo-review/.claude-plugin/plugin.json; do
+for f in \
+  .claude-plugin/marketplace.json \
+  plugins/repo-review/.claude-plugin/plugin.json; do
   if python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"; then
     printf '  ok   %s\n' "$f"
   else
