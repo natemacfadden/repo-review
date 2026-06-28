@@ -81,6 +81,40 @@ function normalizeArgs(args) {
     .filter(r => r.path)
   return { repos, profile }
 }
+
+// the world of allowed profiles. a profile sets WHO is judging and the verdict
+// scale; flavor (what the repo is for) is orthogonal. framing text per profile
+// is added at the prompt-building step.
+const PROFILES = {
+  general: {
+    label: 'general code-quality review',
+    verdicts: ['Excellent', 'Good', 'Fair', 'Poor'],
+  },
+  job: {
+    label: 'job-application portfolio piece',
+    verdicts: ['Strong Hire', 'Hire', 'Lean Hire', 'Lean No-Hire', 'No-Hire'],
+  },
+  'oss-audit': {
+    label: 'open-source health / adoptability',
+    verdicts: ['Adopt', 'Use with care', 'Avoid'],
+  },
+  'student-project': {
+    label: 'student learning project',
+    verdicts: ['A', 'B', 'C', 'D', 'F'],
+  },
+}
+const DEFAULT_PROFILE = 'general'
+
+// resolve a profile name to its config. null/empty -> default; unknown throws
+// (a typo silently becoming `general` would misrepresent the review given).
+function resolveProfile(name) {
+  const key = name == null || name === '' ? DEFAULT_PROFILE : name
+  if (!Object.prototype.hasOwnProperty.call(PROFILES, key)) {
+    const valid = Object.keys(PROFILES).join(', ')
+    throw new Error(`unknown profile ${JSON.stringify(name)} (valid: ${valid})`)
+  }
+  return { name: key, ...PROFILES[key] }
+}
 // <<< pure
 
 // TODO(port): CORE lenses, clone/build/run machinery, schemas, orchestration
