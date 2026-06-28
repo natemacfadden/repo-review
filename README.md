@@ -23,13 +23,15 @@ Run these as slash commands inside a Claude Code session (not a shell):
 Then, in the same session:
 
 ```
-/repo-review <repo-path>[:flavor]... [--profile <name>]
+/repo-review <repo-path>[:flavor]... [--profile <name>] [--for "<text>"]
 ```
 
 - `<repo-path>[:flavor]...` - one or more repos (batch); attach `:flavor` to
   set that repo's flavor explicitly
 - `--profile <name>` - audience and verdict framing for the whole run
   (default: general)
+- `--for "<text>"` - free-text specialization of the profile, e.g. a target
+  company or role (quote multi-word values)
 
 Flavor (what the repo is for - tunes per-lens expectations) is resolved per
 repo: an explicit `:flavor` if given, else auto-detected from the repo. Values:

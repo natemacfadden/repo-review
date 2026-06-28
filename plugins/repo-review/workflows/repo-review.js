@@ -38,29 +38,44 @@ function splitRepoToken(token) {
   return { path: token, flavor: null }
 }
 
-// parse the raw command argument string into { repos, profile }.
-// `--profile <name>` (or --profile=<name>) sets the run-level profile; every
-// other non-flag token is a repo, optionally path:flavor. whitespace-delimited
-// (paths containing spaces are not supported); unknown --flags are ignored.
+// whitespace-split into tokens, honoring "double" and 'single' quotes so a
+// quoted value (e.g. --for "a RE role at Anthropic") stays one token.
+function tokenize(str) {
+  const out = []
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g
+  let m
+  while ((m = re.exec(str)) !== null) {
+    out.push(m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3])
+  }
+  return out
+}
+
+// parse the raw arg string into { repos, profile, specialization }.
+// `--profile <name>` sets the profile; `--for <text>` adds free-text
+// specialization (quote multi-word values); other non-flag tokens are repos.
 function parseArgs(argstr) {
-  const raw = String(argstr == null ? '' : argstr).trim()
-  const tokens = raw ? raw.split(/\s+/) : []
+  const tokens = tokenize(String(argstr == null ? '' : argstr))
   const repos = []
   let profile = null
+  let specialization = null
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]
-    if (t === '--profile') {
+    if (t === '--profile' || t === '--for') {
       const next = tokens[i + 1]
-      if (next && !next.startsWith('--')) { profile = next; i++ }
+      const val = next && !next.startsWith('--') ? tokens[++i] : null
+      if (t === '--profile') profile = val || profile
+      else specialization = val || specialization
     } else if (t.startsWith('--profile=')) {
       profile = t.slice('--profile='.length) || profile
+    } else if (t.startsWith('--for=')) {
+      specialization = t.slice('--for='.length) || specialization
     } else if (t.startsWith('--')) {
       // unknown flag - ignore
     } else {
       repos.push(splitRepoToken(t))
     }
   }
-  return { repos, profile }
+  return { repos, profile, specialization }
 }
 
 // normalize whatever the command passes - a raw string or a structured object
@@ -71,6 +86,8 @@ function normalizeArgs(args) {
     return parseArgs(args == null ? '' : args)
   }
   const profile = typeof args.profile === 'string' ? args.profile : null
+  const specialization =
+    typeof args.specialization === 'string' ? args.specialization : null
   const list = Array.isArray(args.repos) ? args.repos : []
   const repos = list
     .map(r => {
@@ -80,7 +97,7 @@ function normalizeArgs(args) {
       return { path, flavor }
     })
     .filter(r => r.path)
-  return { repos, profile }
+  return { repos, profile, specialization }
 }
 
 // the world of allowed profiles. a profile sets WHO is judging and the verdict
@@ -89,18 +106,42 @@ function normalizeArgs(args) {
 const PROFILES = {
   general: {
     label: 'general code-quality review',
+    audience: 'a senior engineer doing a neutral code-quality review',
+    bar: 'a solid professional engineering standard',
+    purpose:
+      'judge the repo on its own terms as software, with no specific ' +
+      'downstream use assumed',
     verdicts: ['Excellent', 'Good', 'Fair', 'Poor'],
   },
   job: {
     label: 'job-application portfolio piece',
+    audience:
+      'a hiring committee evaluating this repo as a candidate portfolio ' +
+      'piece',
+    bar: 'a strong professional hiring bar, calibrated to the role',
+    purpose:
+      'judge whether this repo, as one portfolio artifact, is a positive ' +
+      'hiring signal for the stated role',
     verdicts: ['Strong Hire', 'Hire', 'Lean Hire', 'Lean No-Hire', 'No-Hire'],
   },
   'oss-audit': {
     label: 'open-source health / adoptability',
+    audience: 'a team deciding whether to adopt or depend on this project',
+    bar: 'the bar for taking on an external dependency in production',
+    purpose:
+      'judge the health, maintainability, and adoptability of this ' +
+      'project as a dependency',
     verdicts: ['Adopt', 'Use with care', 'Avoid'],
   },
   'student-project': {
     label: 'student learning project',
+    audience: 'an instructor grading a student learning project',
+    bar:
+      'a gentler bar for a learning exercise, weighting understanding and ' +
+      'correctness over production polish',
+    purpose:
+      'judge what the work demonstrates about the learning and grasp of ' +
+      'the problem',
     verdicts: ['A', 'B', 'C', 'D', 'F'],
   },
 }
@@ -108,13 +149,19 @@ const DEFAULT_PROFILE = 'general'
 
 // resolve a profile name to its config. null/empty -> default; unknown throws
 // (a typo silently becoming `general` would misrepresent the review given).
-function resolveProfile(name) {
+function resolveProfile(name, specialization) {
   const key = name == null || name === '' ? DEFAULT_PROFILE : name
   if (!Object.prototype.hasOwnProperty.call(PROFILES, key)) {
     const valid = Object.keys(PROFILES).join(', ')
     throw new Error(`unknown profile ${JSON.stringify(name)} (valid: ${valid})`)
   }
-  return { name: key, ...PROFILES[key] }
+  const p = { name: key, ...PROFILES[key] }
+  if (specialization) {
+    p.specialization = specialization
+    p.audience = `${p.audience} (specifically: ${specialization})`
+    p.purpose = `${p.purpose}, specifically for: ${specialization}`
+  }
+  return p
 }
 
 // the 7 scored axes (each 1-10). the first five are lens-owned: a reviewer
@@ -276,8 +323,8 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores) {
 }
 
 // ---- orchestration: per repo, detect -> reviews -> synthesis -------------
-const { repos, profile: profileName } = normalizeArgs(args)
-const profile = resolveProfile(profileName)
+const { repos, profile: profileName, specialization } = normalizeArgs(args)
+const profile = resolveProfile(profileName, specialization)
 if (!repos.length) return { error: 'no repositories given', profile: profile.name }
 log(`repo-review: ${repos.length} repo(s), profile ${profile.name}`)
 

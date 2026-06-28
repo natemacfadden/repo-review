@@ -28,10 +28,10 @@ test('splitRepoToken: windows drive letter survives', () => {
   assert.deepEqual(splitRepoToken('C:/repo'), { path: 'C:/repo', flavor: null })
 })
 
-test('parseArgs: empty -> no repos, no profile', () => {
-  assert.deepEqual(parseArgs(''), { repos: [], profile: null })
-  assert.deepEqual(parseArgs('   '), { repos: [], profile: null })
-  assert.deepEqual(parseArgs(null), { repos: [], profile: null })
+test('parseArgs: empty -> no repos, no profile, no specialization', () => {
+  assert.deepEqual(parseArgs(''), { repos: [], profile: null, specialization: null })
+  assert.deepEqual(parseArgs('   '), { repos: [], profile: null, specialization: null })
+  assert.deepEqual(parseArgs(null), { repos: [], profile: null, specialization: null })
 })
 
 test('parseArgs: multiple repos with per-repo flavors', () => {
@@ -42,6 +42,7 @@ test('parseArgs: multiple repos with per-repo flavors', () => {
       { path: './c', flavor: 'performance' },
     ],
     profile: null,
+    specialization: null,
   })
 })
 
@@ -49,6 +50,7 @@ test('parseArgs: --profile with a value, anywhere', () => {
   assert.deepEqual(parseArgs('./a --profile job ./b'), {
     repos: [{ path: './a', flavor: null }, { path: './b', flavor: null }],
     profile: 'job',
+    specialization: null,
   })
 })
 
@@ -56,6 +58,7 @@ test('parseArgs: --profile=value form', () => {
   assert.deepEqual(parseArgs('--profile=job ./a'), {
     repos: [{ path: './a', flavor: null }],
     profile: 'job',
+    specialization: null,
   })
 })
 
@@ -63,6 +66,7 @@ test('parseArgs: --profile with no value is ignored', () => {
   assert.deepEqual(parseArgs('./a --profile'), {
     repos: [{ path: './a', flavor: null }],
     profile: null,
+    specialization: null,
   })
 })
 
@@ -70,23 +74,52 @@ test('parseArgs: unknown flags are ignored, not treated as repos', () => {
   assert.deepEqual(parseArgs('./a --bogus ./b'), {
     repos: [{ path: './a', flavor: null }, { path: './b', flavor: null }],
     profile: null,
+    specialization: null,
   })
 })
 
+test('parseArgs: --for captures a quoted multi-word value', () => {
+  const out = parseArgs('./a --profile job --for "a RE role at Anthropic"')
+  assert.deepEqual(out, {
+    repos: [{ path: './a', flavor: null }],
+    profile: 'job',
+    specialization: 'a RE role at Anthropic',
+  })
+})
+
+test('parseArgs: --for=value (single word) form', () => {
+  assert.equal(parseArgs('./a --for=startup').specialization, 'startup')
+})
+
+test('parseArgs: quotes keep a value together; repos still parse', () => {
+  const out = parseArgs("'./a b' --for 'x y'")
+  assert.deepEqual(out.repos, [{ path: './a b', flavor: null }])
+  assert.equal(out.specialization, 'x y')
+})
+
 test('normalizeArgs: string delegates to parseArgs', () => {
-  const s = './a:personal --profile job'
+  const s = './a:personal --profile job --for "team X"'
   assert.deepEqual(normalizeArgs(s), parseArgs(s))
 })
 
 test('normalizeArgs: null/undefined -> empty', () => {
-  assert.deepEqual(normalizeArgs(null), { repos: [], profile: null })
-  assert.deepEqual(normalizeArgs(undefined), { repos: [], profile: null })
+  const empty = { repos: [], profile: null, specialization: null }
+  assert.deepEqual(normalizeArgs(null), empty)
+  assert.deepEqual(normalizeArgs(undefined), empty)
 })
 
 test('normalizeArgs: structured object passes through', () => {
   assert.deepEqual(
-    normalizeArgs({ repos: [{ path: './a', flavor: 'personal' }], profile: 'job' }),
-    { repos: [{ path: './a', flavor: 'personal' }], profile: 'job' },
+    normalizeArgs({
+      repos: [{ path: './a', flavor: 'personal' }],
+      profile: 'job',
+      specialization: 'team X',
+    }),
+    {
+      repos: [{ path: './a', flavor: 'personal' }],
+      profile: 'job',
+      specialization: 'team X',
+    },
   )
 })
 
@@ -97,6 +130,7 @@ test('normalizeArgs: string repo items are split', () => {
       { path: './b', flavor: null },
     ],
     profile: null,
+    specialization: null,
   })
 })
 
@@ -104,13 +138,12 @@ test('normalizeArgs: unknown flavor coerced to null', () => {
   assert.deepEqual(normalizeArgs({ repos: [{ path: './a', flavor: 'bogus' }] }), {
     repos: [{ path: './a', flavor: null }],
     profile: null,
+    specialization: null,
   })
 })
 
 test('normalizeArgs: bad repos shape -> empty; pathless items dropped', () => {
-  assert.deepEqual(normalizeArgs({ repos: 'nope' }), { repos: [], profile: null })
-  assert.deepEqual(normalizeArgs({ repos: [{ flavor: 'personal' }] }), {
-    repos: [],
-    profile: null,
-  })
+  const empty = { repos: [], profile: null, specialization: null }
+  assert.deepEqual(normalizeArgs({ repos: 'nope' }), empty)
+  assert.deepEqual(normalizeArgs({ repos: [{ flavor: 'personal' }] }), empty)
 })

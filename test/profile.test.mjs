@@ -19,6 +19,16 @@ test('resolveProfile: each v1 profile resolves with a verdict scale', () => {
   }
 })
 
+test('resolveProfile: every profile carries framing fields', () => {
+  for (const name of ['general', 'job', 'oss-audit', 'student-project']) {
+    const p = resolveProfile(name)
+    for (const field of ['label', 'audience', 'bar', 'purpose']) {
+      assert.equal(typeof p[field], 'string')
+      assert.ok(p[field].length > 0, `${name}.${field} should be non-empty`)
+    }
+  }
+})
+
 test('resolveProfile: job verdict scale', () => {
   assert.deepEqual(resolveProfile('job').verdicts, [
     'Strong Hire',
@@ -27,6 +37,16 @@ test('resolveProfile: job verdict scale', () => {
     'Lean No-Hire',
     'No-Hire',
   ])
+})
+
+test('resolveProfile: --for specialization is woven into the framing', () => {
+  const base = resolveProfile('job')
+  const spec = resolveProfile('job', 'a RE role at Anthropic')
+  assert.equal(spec.specialization, 'a RE role at Anthropic')
+  assert.match(spec.audience, /a RE role at Anthropic/)
+  assert.match(spec.purpose, /a RE role at Anthropic/)
+  // base (no specialization) is unchanged and carries no field
+  assert.equal(base.specialization, undefined)
 })
 
 test('resolveProfile: unknown throws and lists valid names', () => {
