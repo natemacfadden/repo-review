@@ -13,10 +13,10 @@ applies to the whole run. Each repo's **flavor** (what it is for, tuning
 per-lens expectations) is resolved per repo: an explicit `path:flavor` if
 given, else auto-detected by a per-repo detection agent.
 
-Parse arguments: each non-flag token in `$ARGUMENTS` is a repo, optionally
-`path:flavor` - split on the last `:` only when the suffix is a known flavor
-(performance, research, production, personal). `--profile <name>` may appear
-anywhere and applies to the run.
+Pass `$ARGUMENTS` through to the workflow unchanged - it parses the tokens
+itself (each non-flag token is a repo, optionally `path:flavor` for known
+flavors performance/research/production/personal; `--profile <name>` sets the
+run profile). Do not pre-parse.
 
 ## Run
 
@@ -26,7 +26,7 @@ command invocation is your authorization), use it:
 ```
 Workflow({
   scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/repo-review.js",
-  args: { repos: [{ path, flavor }, ...], profile: "<--profile or omit>" }
+  args: "$ARGUMENTS"
 })
 ```
 

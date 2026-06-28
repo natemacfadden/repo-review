@@ -19,6 +19,70 @@ export const meta = {
   ],
 }
 
+// >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
+// must use no workflow globals (agent/parallel/args/...) - pure functions only.
+const KNOWN_FLAVORS = ['performance', 'research', 'production', 'personal']
+
+// split a repo token into { path, flavor }. only treat a trailing :suffix as a
+// flavor when it names a known flavor; otherwise the whole token is the path
+// (so absolute paths and windows drive letters survive intact).
+function splitRepoToken(token) {
+  const i = token.lastIndexOf(':')
+  if (i > 0) {
+    const suffix = token.slice(i + 1)
+    if (KNOWN_FLAVORS.includes(suffix)) {
+      return { path: token.slice(0, i), flavor: suffix }
+    }
+  }
+  return { path: token, flavor: null }
+}
+
+// parse the raw command argument string into { repos, profile }.
+// `--profile <name>` (or --profile=<name>) sets the run-level profile; every
+// other non-flag token is a repo, optionally path:flavor. whitespace-delimited
+// (paths containing spaces are not supported); unknown --flags are ignored.
+function parseArgs(argstr) {
+  const raw = String(argstr == null ? '' : argstr).trim()
+  const tokens = raw ? raw.split(/\s+/) : []
+  const repos = []
+  let profile = null
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]
+    if (t === '--profile') {
+      const next = tokens[i + 1]
+      if (next && !next.startsWith('--')) { profile = next; i++ }
+    } else if (t.startsWith('--profile=')) {
+      profile = t.slice('--profile='.length) || profile
+    } else if (t.startsWith('--')) {
+      // unknown flag - ignore
+    } else {
+      repos.push(splitRepoToken(t))
+    }
+  }
+  return { repos, profile }
+}
+
+// normalize whatever the command passes - a raw string or a structured object
+// - into { repos: [{path, flavor}], profile }. strings go through parseArgs;
+// objects are validated/coerced and unknown flavors dropped to null.
+function normalizeArgs(args) {
+  if (typeof args === 'string' || args == null) {
+    return parseArgs(args == null ? '' : args)
+  }
+  const profile = typeof args.profile === 'string' ? args.profile : null
+  const list = Array.isArray(args.repos) ? args.repos : []
+  const repos = list
+    .map(r => {
+      if (typeof r === 'string') return splitRepoToken(r)
+      const path = r && typeof r.path === 'string' ? r.path : ''
+      const flavor = r && KNOWN_FLAVORS.includes(r.flavor) ? r.flavor : null
+      return { path, flavor }
+    })
+    .filter(r => r.path)
+  return { repos, profile }
+}
+// <<< pure
+
 // TODO(port): CORE lenses, clone/build/run machinery, schemas, orchestration
 // TODO(port): PROFILE overlay selected by args.profile (default: general)
 throw new Error('repo-review workflow not yet implemented - scaffold only')
