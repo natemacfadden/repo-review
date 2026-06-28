@@ -3,9 +3,6 @@ description: Clone, build, run, and review a repo across five lenses
 argument-hint: <repo-path[:flavor]>... [--profile <name>] [--for <text>]
 ---
 
-WIP - orchestration is wired; the per-agent prompt content is still being
-filled in.
-
 Review one or more code repositories by actually standing each up: clone,
 build, run a demo, then judge across five lenses (performance, correctness,
 engineering, taste & positioning, documentation) and synthesize a scored
@@ -48,4 +45,20 @@ Workflow({
 
 Both forms normalize to the same `{ repos, profile, specialization }`.
 
-**Fallback** (no Workflow tool): TODO - single-agent inline review.
+**Fallback** (no Workflow tool). The Workflow engine is only deterministic
+orchestration - the reviewing is agent work, so reproduce the structure with
+subagents.
+
+If you can spawn subagents (Task/Agent tool): parse the arguments as the
+workflow would. For each repo, ONE AT A TIME (keep profiling uncontended and
+RAM bounded), spawn the five lens reviewers as separate subagents - each with
+its lens brief: clone/build/run a fresh copy, WRITE AND RUN ITS OWN TESTS,
+profile hot paths, score the seven axes 1-10, recommend on the profile's
+verdict scale, and write its per-lens doc. Then reconcile the scores yourself
+- lens-weighted: the owning lens counts double on its own axis; honesty and
+overall are a plain mean - and write the memo (verdict, outliers,
+disagreements, consensus, oversell/undersell call, fixes) to
+`repo-review-out/<repo>/MEMO.md`.
+
+If you cannot spawn subagents, do it inline as a single reviewer across the
+five lenses - lower fidelity; note the reduced independence.
