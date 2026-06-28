@@ -15,7 +15,7 @@ export const meta = {
     'Default profile is a general code-quality review.',
   phases: [
     { title: 'Detect', detail: 'per-repo flavor detection (when not given)' },
-    { title: 'Reviews', detail: 'five lens reviewers per repo, in parallel' },
+    { title: 'Reviews', detail: 'five lens reviewers per repo, one at a time' },
     { title: 'Synthesis', detail: 'reconcile (code) + write the memo' },
   ],
 }
@@ -201,7 +201,52 @@ function reconcileScores(reviews) {
   }
   return { reconciled, ranges }
 }
+
+// per-flavor modulation: how a repo's intended use tunes lens expectations.
+// null means no specific use given -> balanced, general expectations.
+const FLAVOR_GUIDANCE = {
+  performance:
+    'High-performance project: hold performance claims to a high bar - ' +
+    'require benchmarks with warmup, repeated trials, variance/error bars, ' +
+    'fixed reported hardware, and fair baselines; a missing benchmark ' +
+    'harness is a real gap.',
+  research:
+    'Research artifact: judge computational efficiency and soundness as ' +
+    'research, not product-grade throughput. Paper-substantiated efficiency ' +
+    'claims are acceptable; do not require an in-repo benchmark harness or ' +
+    'on-machine reproduction of headline numbers. Penalize unsupported or ' +
+    'sloppy claims, not the mere absence of production benchmarking.',
+  production:
+    'Built for widespread/production use: weight engineering maturity, ' +
+    'documentation, reliability, and API stability heavily; novelty ' +
+    'matters less here.',
+  personal:
+    'Small/personal project: relax engineering-maturity expectations (CI, ' +
+    'packaging, exhaustive tests); focus on whether it does its job ' +
+    'clearly, and do not penalize the absence of production infrastructure.',
+}
+const BALANCED_GUIDANCE =
+  'No specific intended use was given: judge with balanced, general ' +
+  'expectations - neither demanding production infrastructure nor excusing ' +
+  'its absence.'
+
+// describe how a flavor tunes expectations (null/unknown -> balanced default).
+function describeFlavor(flavor) {
+  return (flavor && FLAVOR_GUIDANCE[flavor]) || BALANCED_GUIDANCE
+}
+
+// filesystem-safe short name from a repo path, for temp dirs and output files.
+function repoSlug(path) {
+  const trimmed = String(path || '').replace(/[/\\]+$/, '')
+  const base = trimmed.split(/[/\\]/).pop()
+  if (!base || base === '.' || base === '..') return 'repo'
+  return base.replace(/[^A-Za-z0-9_.-]/g, '-') || 'repo'
+}
 // <<< pure
+
+// where per-lens reviews and memos are written (outside the temp clones, which
+// get deleted). TODO: make overridable via args.
+const OUTDIR = 'repo-review-out'
 
 // ---- lenses (CORE) -------------------------------------------------------
 const LENSES = [
@@ -288,13 +333,24 @@ const DETECT_SCHEMA = {
     rationale: { type: 'string' },
   },
 }
-const REVIEW_SCHEMA = {
-  type: 'object',
-  required: ['scores', 'review'],
-  properties: {
-    scores: { type: 'object', required: SCORE_AXES, properties: SCORE_PROPS },
-    review: { type: 'string', description: 'per-lens review markdown doc' },
-  },
+// built per-run so `recommendation` validates against the profile's verdicts.
+function buildReviewSchema(profile) {
+  return {
+    type: 'object',
+    required: ['reviewedCommit', 'scores', 'recommendation', 'review'],
+    properties: {
+      reviewedCommit: { type: 'string', description: 'commit reviewed' },
+      scores: { type: 'object', required: SCORE_AXES, properties: SCORE_PROPS },
+      scoreJustifications: { type: 'object', description: 'one line per axis' },
+      recommendation: { type: 'string', enum: profile.verdicts },
+      strengths: { type: 'array', items: { type: 'string' } },
+      weaknesses: { type: 'array', items: { type: 'string' } },
+      testsWritten: { type: 'string', description: 'tests you wrote + results' },
+      oversellAssessment: { type: 'string' },
+      review: { type: 'string', description: 'full per-lens review markdown' },
+      cleanupConfirmed: { type: 'boolean' },
+    },
+  }
 }
 const SYNTHESIS_SCHEMA = {
   type: 'object',
@@ -312,9 +368,69 @@ function detectPrompt(repo) {
     `(one of: ${KNOWN_FLAVORS.join(', ')}).`
 }
 function reviewPrompt(repo, lens, profile, flavor) {
-  return `TODO: review ${repo.path} through the ${lens.title} lens, as a ` +
-    `${profile.label} (flavor: ${flavor || 'balanced'}). Score every axis ` +
-    `and write a per-lens review doc.`
+  const slug = repoSlug(repo.path)
+  const tmp = `/tmp/rr-${slug}-${lens.key}`
+  const outPath = `${OUTDIR}/${slug}/${lens.key}.md`
+  const verdicts = profile.verdicts.join(', ')
+  return [
+    `You are ${profile.audience}. You are reviewing the repository at ` +
+      `\`${repo.path}\`, and your job is to ${profile.purpose}. Judge it ` +
+      `against ${profile.bar}.`,
+    `Repo intent (flavor): ${describeFlavor(flavor)}`,
+    `YOUR LENS - weight this heavily, on top of a full review: ` +
+      `${lens.title}.\n${lens.focus}`,
+    'You are dropped in COLD, like a real reviewer who just found this ' +
+      'repo. Read the README, form honest first impressions, then get ' +
+      'hands-on.',
+    'SET UP YOUR OWN ISOLATED COPY (ease of standup is part of the ' +
+      'review):\n' +
+      '1. Clone only committed code into a fresh temp dir you own:\n' +
+      `   rm -rf ${tmp} && git clone ${repo.path} ${tmp}\n` +
+      '   (if not a git repo, copy the tree and strip build ' +
+      'artifacts/venvs). Work inside it; never modify the original at ' +
+      `${repo.path}. Record the exact commit: git -C ${tmp} rev-parse ` +
+      'HEAD.\n' +
+      '2. Build/install from scratch per the README, in an isolated env ' +
+      '(e.g. a venv inside the temp dir). Record every step, error, and ' +
+      'workaround - setup friction is a real finding.\n' +
+      '3. Actually RUN a demo/example and observe real output.',
+    'BE HANDS-ON - THIS IS THE POINT. You have a private clone; use it:\n' +
+      '- Run ANY code you want. Reproduce the headline claims and stress ' +
+      'them.\n' +
+      '- WRITE YOUR OWN TESTS. Author new test cases / scripts in your ' +
+      'clone and run them to independently verify behavior, correctness, ' +
+      'and (where relevant) performance - go BEYOND the tests the repo ' +
+      'ships. This is required, not optional. Report what you wrote and ' +
+      'what it showed.\n' +
+      '- For performance, actually PROFILE the code yourself ' +
+      '(cProfile/pprofile for Python, or a profiler appropriate to the ' +
+      'stack) to find where time goes - do not take claims on faith.\n' +
+      '- Note additional validation/tests the authors should add.',
+    'MACHINE IS RAM-LIMITED: before any heavy build/run, check available ' +
+      'memory (e.g. free -m). If memory is tight or an op risks an OOM ' +
+      'kill, downgrade that step to a read-only assessment and say so - ' +
+      'never risk OOM.',
+    'EVIDENCE & ATTRIBUTION: for any defect or claim, cite the exact ' +
+      'file:line in the repo and quote the offending text. Never attribute ' +
+      'to the repo anything that came from THESE instructions (the example ' +
+      'paths/commands above are NOT the words of the repo) - verify every ' +
+      'detail against the actual repo files.',
+    'SCORE ALL SEVEN AXES (1-10, one-line justification each; do not ' +
+      `inflate; calibrate to ${profile.bar}): performance, correctness, ` +
+      'engineering, taste, documentation, honesty (is the repo ' +
+      'over/underclaiming?), overall.',
+    `Also give a RECOMMENDATION for this lens, one of: ${verdicts}.`,
+    `WRITE THE REVIEW DOC: save a full markdown review to ${outPath} ` +
+      '(first line: the reviewed commit hash). Cover: first impressions; ' +
+      'install & run experience; the tests you wrote and what they showed; ' +
+      'your special-lens deep dive; per-axis scores + justifications; ' +
+      'strengths; weaknesses/red flags; overselling-vs-underselling; ' +
+      'cleanup confirmation. This doc is the human-readable deliverable.',
+    `CLEAN UP COMPLETELY: rm ${tmp} and remove anything installed ` +
+      'system-wide; leave no trace. Confirm cleanup.',
+    'Return your result via the structured-output tool, populating every ' +
+      'field.',
+  ].join('\n\n')
 }
 function synthesisPrompt(repo, profile, flavor, reviews, scores) {
   return `TODO: synthesize ${reviews.length} reviews of ${repo.path} into a ` +
@@ -322,47 +438,52 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores) {
     `recompute); identify outliers; write the memo doc.`
 }
 
-// ---- orchestration: per repo, detect -> reviews -> synthesis -------------
+// ---- orchestration -------------------------------------------------------
+// Fully SEQUENTIAL by design: repos one at a time, and the five lens reviewers
+// one at a time within each. Only one clone/build/run is ever active, so
+// profiling/benchmarks are uncontended and RAM stays bounded.
 const { repos, profile: profileName, specialization } = normalizeArgs(args)
 const profile = resolveProfile(profileName, specialization)
 if (!repos.length) return { error: 'no repositories given', profile: profile.name }
+const reviewSchema = buildReviewSchema(profile)
 log(`repo-review: ${repos.length} repo(s), profile ${profile.name}`)
 
-const results = await pipeline(
-  repos,
-  // stage 1: resolve flavor - detect only when not given inline
-  async (repo) => {
-    let flavor = repo.flavor
-    if (!flavor) {
-      const d = await agent(detectPrompt(repo), {
-        label: `detect:${repo.path}`, phase: 'Detect', schema: DETECT_SCHEMA,
-      })
-      flavor = (d && d.flavor) || null
-    }
-    return { repo, flavor }
-  },
-  // stage 2: five lens reviewers in parallel, then code-side reconcile
-  async ({ repo, flavor }) => {
-    const reviews = await parallel(LENSES.map(lens => () =>
-      agent(reviewPrompt(repo, lens, profile, flavor), {
-        label: `review:${repo.path}:${lens.key}`,
-        phase: 'Reviews', schema: REVIEW_SCHEMA,
-      }).then(r => (r ? { ...r, lens: lens.key } : null))))
-    const ok = reviews.filter(Boolean)
-    return { repo, flavor, reviews: ok, scores: reconcileScores(ok) }
-  },
-  // stage 3: synthesis agent narrates (does not recompute) + writes the memo
-  async ({ repo, flavor, reviews, scores }) => {
-    const synthesis = await agent(
-      synthesisPrompt(repo, profile, flavor, reviews, scores),
-      {
-        label: `synthesis:${repo.path}`,
-        phase: 'Synthesis',
-        schema: SYNTHESIS_SCHEMA,
-      },
-    )
-    return { repo: repo.path, flavor, scores, synthesis }
-  },
-)
+const results = []
+for (const repo of repos) {
+  // resolve flavor: detect only when not given inline
+  let flavor = repo.flavor
+  if (!flavor) {
+    const d = await agent(detectPrompt(repo), {
+      label: `detect:${repo.path}`, phase: 'Detect', schema: DETECT_SCHEMA,
+    })
+    flavor = (d && d.flavor) || null
+  }
 
-return { profile: profile.name, repos: results.filter(Boolean) }
+  // five lens reviewers, strictly one at a time
+  const reviews = []
+  for (const lens of LENSES) {
+    log(`review ${repo.path} :: ${lens.title}`)
+    const r = await agent(reviewPrompt(repo, lens, profile, flavor), {
+      label: `review:${repo.path}:${lens.key}`,
+      phase: 'Reviews', schema: reviewSchema,
+    })
+    if (r) reviews.push({ ...r, lens: lens.key })
+  }
+
+  const scores = reconcileScores(reviews)
+
+  // synthesis narrates + identifies outliers + writes the memo; it does NOT
+  // recompute the scores (those come from reconcileScores above)
+  const synthesis = await agent(
+    synthesisPrompt(repo, profile, flavor, reviews, scores),
+    {
+      label: `synthesis:${repo.path}`,
+      phase: 'Synthesis',
+      schema: SYNTHESIS_SCHEMA,
+    },
+  )
+
+  results.push({ repo: repo.path, flavor, scores, synthesis })
+}
+
+return { profile: profile.name, repos: results }

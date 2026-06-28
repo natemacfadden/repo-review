@@ -3,11 +3,21 @@ import assert from 'node:assert/strict'
 import { loadPure } from './extract.mjs'
 
 const WF = 'plugins/repo-review/workflows/repo-review.js'
-const { splitRepoToken, parseArgs, normalizeArgs } = loadPure(WF, [
+const { splitRepoToken, parseArgs, normalizeArgs, repoSlug } = loadPure(WF, [
   'splitRepoToken',
   'parseArgs',
   'normalizeArgs',
+  'repoSlug',
 ])
+
+test('repoSlug: takes the last path segment, sanitized', () => {
+  assert.equal(repoSlug('./my-repo'), 'my-repo')
+  assert.equal(repoSlug('/home/x/foo'), 'foo')
+  assert.equal(repoSlug('foo/'), 'foo')
+  assert.equal(repoSlug('a b'), 'a-b')
+  assert.equal(repoSlug('.'), 'repo')
+  assert.equal(repoSlug(''), 'repo')
+})
 
 test('splitRepoToken: bare path -> no flavor', () => {
   assert.deepEqual(splitRepoToken('./repo'), { path: './repo', flavor: null })
