@@ -115,6 +115,44 @@ function resolveProfile(name) {
   }
   return { name: key, ...PROFILES[key] }
 }
+
+// the 7 scored axes (each 1-10). the first five are lens-owned: a reviewer
+// whose lens matches the axis is the specialist for it.
+const SCORE_AXES = [
+  'performance', 'correctness', 'engineering', 'taste',
+  'documentation', 'honesty', 'overall',
+]
+const LENS_OWNED = new Set([
+  'performance', 'correctness', 'engineering', 'taste', 'documentation',
+])
+const OWNER_WEIGHT = 2
+
+// reconcile per-axis scores across reviews. on a lens-owned axis the owning
+// reviewer counts OWNER_WEIGHT, others 1 (weighted mean); honesty/overall have
+// no owner, so plain mean. also report the min-max range per axis. an axis
+// with no numeric scores reconciles to null.
+function reconcileScores(reviews) {
+  const list = Array.isArray(reviews) ? reviews : []
+  const reconciled = {}
+  const ranges = {}
+  for (const axis of SCORE_AXES) {
+    let weighted = 0, wsum = 0, n = 0
+    let min = Infinity, max = -Infinity
+    for (const r of list) {
+      const s = r && r.scores ? r.scores[axis] : undefined
+      if (typeof s !== 'number' || Number.isNaN(s)) continue
+      const w = LENS_OWNED.has(axis) && r.lens === axis ? OWNER_WEIGHT : 1
+      weighted += s * w
+      wsum += w
+      n++
+      if (s < min) min = s
+      if (s > max) max = s
+    }
+    reconciled[axis] = n ? Math.round((weighted / wsum) * 10) / 10 : null
+    ranges[axis] = n ? { min, max } : null
+  }
+  return { reconciled, ranges }
+}
 // <<< pure
 
 // TODO(port): CORE lenses, clone/build/run machinery, schemas, orchestration
