@@ -38,15 +38,11 @@ as `/<plugin>:<command>`.)
 
 ## Update
 
-To pick up a newer pushed version, refresh the marketplace clone (a plain
-reinstall is not enough - it reuses the cached clone), then reload:
-
-```
-/plugin marketplace update repo-review
-/reload-plugins
-```
-
-If a renamed or removed command lingers afterward, do a clean reinstall:
+Picking up a newer pushed version takes a full reinstall, not just a
+marketplace refresh. `/plugin marketplace update` refreshes the catalog clone,
+but the installed plugin is a separate cached snapshot that only changes when
+you reinstall - so `marketplace update` + `/reload-plugins` alone does **not**
+pick up changes (observed in practice). Run all four:
 
 ```
 /plugin uninstall repo-review@repo-review
@@ -54,6 +50,8 @@ If a renamed or removed command lingers afterward, do a clean reinstall:
 /plugin install repo-review@repo-review
 /reload-plugins
 ```
+
+The `uninstall` also drops any renamed or removed command so it does not linger.
 
 ## Uninstall
 
