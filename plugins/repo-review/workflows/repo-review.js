@@ -329,7 +329,7 @@ const DETECT_SCHEMA = {
   type: 'object',
   required: ['flavor'],
   properties: {
-    flavor: { type: 'string', enum: KNOWN_FLAVORS },
+    flavor: { type: ['string', 'null'], enum: [...KNOWN_FLAVORS, null] },
     rationale: { type: 'string' },
   },
 }
@@ -364,8 +364,26 @@ const SYNTHESIS_SCHEMA = {
 
 // ---- prompt builders (TODO: flesh out the actual prompt content) ---------
 function detectPrompt(repo) {
-  return `TODO: inspect ${repo.path} and classify its flavor ` +
-    `(one of: ${KNOWN_FLAVORS.join(', ')}).`
+  return [
+    `You are classifying the INTENT of the repository at \`${repo.path}\` - ` +
+      'what it is FOR - so a downstream review can calibrate its ' +
+      'expectations. This is a quick, READ-ONLY inspection: do NOT build or ' +
+      'run anything.',
+    'Read the README, package manifests, any benchmarks/ or tests/ dirs, CI ' +
+      'config, and skim the code and its scale. Then classify into exactly ' +
+      'one flavor:\n' +
+      '- performance: speed/efficiency is a headline goal (benchmarks, ' +
+      'optimization focus, perf claims).\n' +
+      '- research: a research artifact (e.g. paper-associated code) where ' +
+      'soundness and efficiency matter more than product-grade throughput.\n' +
+      '- production: built for widespread/production use - a library, ' +
+      'service, or tool meant for others to depend on.\n' +
+      '- personal: a small or personal project (scripts, experiments, ' +
+      'learning).',
+    'If the repo genuinely fits none, or the signal is mixed/unclear, return ' +
+      'flavor = null and the review will use balanced expectations. Give a ' +
+      'one-line rationale citing what you saw (file names, README lines).',
+  ].join('\n\n')
 }
 function reviewPrompt(repo, lens, profile, flavor) {
   const slug = repoSlug(repo.path)
