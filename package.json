@@ -1,0 +1,12 @@
+{
+  "name": "repo-review-dev",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dev/CI tooling for the repo-review Claude Code plugin",
+  "scripts": {
+    "check": "bash scripts/check.sh"
+  },
+  "devDependencies": {
+    "editorconfig-checker": ">=5"
+  }
+}

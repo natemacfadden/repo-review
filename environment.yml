@@ -1,0 +1,13 @@
+# conda environment for repo-review (dev + CI tooling)
+# install: conda env create -f environment.yml
+#
+# layer 1 (runtime): this file provisions node via conda-forge
+# layer 2 (packages): JS dev tools (editorconfig-checker, a test runner) live
+#   in package.json and install into node_modules via `npm install`
+name: repo-review
+channels:
+  - conda-forge
+dependencies:
+  - nodejs>=20
+  # future conda-provided tooling goes here (e.g. python for offline manifest
+  # schema validation); JS dev tools belong in package.json instead

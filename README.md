@@ -47,3 +47,27 @@ repo-review/                       <- this repo doubles as a marketplace
         ├── commands/repo-review.md    <- entry point; invokes the workflow
         └── workflows/repo-review.js   <- the workflow (CORE lenses + PROFILE)
 ```
+
+## Development
+
+For development and CI only - **not** needed to use the plugin. Installing via
+`/plugin` runs it inside Claude Code, which supplies the workflow runtime; none
+of the tooling below ships as a runtime dependency.
+
+Prerequisites: conda and the Claude Code CLI.
+
+```
+conda env create -f environment.yml   # runtime layer: node
+conda activate repo-review
+npm install                           # package layer: dev tools -> node_modules
+```
+
+Run all checks (the same entry point CI runs):
+
+```
+bash scripts/check.sh                 # or: npm run check
+```
+
+It runs the ascii, editorconfig, JSON-manifest, workflow-syntax, and
+`claude plugin validate --strict` checks, collecting every failure before
+exiting non-zero. Tools that aren't installed are skipped, not failed.

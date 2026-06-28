@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # installs devDependencies (editorconfig-checker) into node_modules.
+      # switch to `npm ci` once package-lock.json is committed.
+      - run: npm install
+      # same entry point developers run locally
+      - run: bash scripts/check.sh
