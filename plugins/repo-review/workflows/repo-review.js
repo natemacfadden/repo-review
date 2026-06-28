@@ -46,32 +46,37 @@ function tokenize(str) {
   return out
 }
 
-// parse the raw arg string into { repos, profile, specialization }.
+// parse the raw arg string into { repos, profile, specialization, outDir }.
 // `--profile <name>` sets the profile; `--for <text>` adds free-text
-// specialization (quote multi-word values); other non-flag tokens are repos.
+// specialization; `--out <abs>` sets the absolute output base (quote
+// multi-word values); other non-flag tokens are repos.
 function parseArgs(argstr) {
   const tokens = tokenize(String(argstr == null ? '' : argstr))
   const repos = []
   let profile = null
   let specialization = null
+  let outDir = null
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]
-    if (t === '--profile' || t === '--for') {
+    if (t === '--profile' || t === '--for' || t === '--out') {
       const next = tokens[i + 1]
       const val = next && !next.startsWith('--') ? tokens[++i] : null
       if (t === '--profile') profile = val || profile
-      else specialization = val || specialization
+      else if (t === '--for') specialization = val || specialization
+      else outDir = val || outDir
     } else if (t.startsWith('--profile=')) {
       profile = t.slice('--profile='.length) || profile
     } else if (t.startsWith('--for=')) {
       specialization = t.slice('--for='.length) || specialization
+    } else if (t.startsWith('--out=')) {
+      outDir = t.slice('--out='.length) || outDir
     } else if (t.startsWith('--')) {
       // unknown flag - ignore
     } else {
       repos.push(splitRepoToken(t))
     }
   }
-  return { repos, profile, specialization }
+  return { repos, profile, specialization, outDir }
 }
 
 // normalize whatever the command passes - a raw string or a structured object
@@ -84,6 +89,7 @@ function normalizeArgs(args) {
   const profile = typeof args.profile === 'string' ? args.profile : null
   const specialization =
     typeof args.specialization === 'string' ? args.specialization : null
+  const outDir = typeof args.outDir === 'string' ? args.outDir : null
   const list = Array.isArray(args.repos) ? args.repos : []
   const repos = list
     .map(r => {
@@ -93,7 +99,7 @@ function normalizeArgs(args) {
       return { path, flavor }
     })
     .filter(r => r.path)
-  return { repos, profile, specialization }
+  return { repos, profile, specialization, outDir }
 }
 
 // the world of allowed profiles. a profile sets WHO is judging and the verdict
@@ -394,10 +400,10 @@ function detectPrompt(repo) {
       'one-line rationale citing what you saw (file names, README lines).',
   ].join('\n\n')
 }
-function reviewPrompt(repo, lens, profile, flavor) {
+function reviewPrompt(repo, lens, profile, flavor, outBase) {
   const slug = repoSlug(repo.path)
   const tmp = `/tmp/rr-${slug}-${lens.key}`
-  const outPath = `${OUTDIR}/${slug}/${lens.key}.md`
+  const outPath = `${outBase}/${slug}/${lens.key}.md`
   const verdicts = profile.verdicts.join(', ')
   return [
     `You are ${profile.audience}. You are reviewing the repository at ` +
@@ -448,7 +454,8 @@ function reviewPrompt(repo, lens, profile, flavor) {
       'over/underclaiming?), overall.',
     `Also give a RECOMMENDATION for this lens, one of: ${verdicts}.`,
     `WRITE THE REVIEW DOC: save a full markdown review to ${outPath} ` +
-      '(first line: the reviewed commit hash). Cover: first impressions; ' +
+      '(write to this exact path - do NOT make it relative to your temp ' +
+      'clone). First line: the reviewed commit hash. Cover: first impressions; ' +
       'install & run experience; the tests you wrote and what they showed; ' +
       'your special-lens deep dive; per-axis scores + justifications; ' +
       'strengths; weaknesses/red flags; overselling-vs-underselling; ' +
@@ -461,9 +468,9 @@ function reviewPrompt(repo, lens, profile, flavor) {
       'in the doc you wrote.',
   ].join('\n\n')
 }
-function synthesisPrompt(repo, profile, flavor, reviews, scores) {
+function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase) {
   const slug = repoSlug(repo.path)
-  const memoPath = `${OUTDIR}/${slug}/MEMO.md`
+  const memoPath = `${outBase}/${slug}/MEMO.md`
   const verdicts = profile.verdicts.join(', ')
   const compact = reviews.map(r => ({
     lens: r.lens,
@@ -532,12 +539,18 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores) {
 // Fully SEQUENTIAL by design: repos one at a time, and the five lens reviewers
 // one at a time within each. Only one clone/build/run is ever active, so
 // profiling/benchmarks are uncontended and RAM stays bounded.
-const { repos, profile: profileName, specialization } = normalizeArgs(args)
+const { repos, profile: profileName, specialization, outDir } =
+  normalizeArgs(args)
 const profile = resolveProfile(profileName, specialization)
 if (!repos.length) return { error: 'no repositories given', profile: profile.name }
+// absolute output base passed by the command (--out <pwd>/repo-review-out) so
+// docs land deterministically at the invocation dir regardless of where lens
+// agents cd to; falls back to the relative default for direct invocation.
+const outBase = outDir || OUTDIR
 const reviewSchema = buildReviewSchema(profile)
 const synthesisSchema = buildSynthesisSchema(profile)
-log(`repo-review: ${repos.length} repo(s), profile ${profile.name}`)
+log(`repo-review: ${repos.length} repo(s), profile ${profile.name}, ` +
+  `output -> ${outBase}`)
 log(
   `heads-up - thorough, token-heavy run: every lens clones, builds, runs ` +
   `the code and writes its own tests over a long session. expect very ` +
@@ -572,7 +585,7 @@ for (const repo of repos) {
   const reviews = []
   for (const lens of LENSES) {
     log(`${tag}: review start - ${lens.title}`)
-    const r = await agent(reviewPrompt(repo, lens, profile, flavor), {
+    const r = await agent(reviewPrompt(repo, lens, profile, flavor, outBase), {
       label: `review:${repo.path}:${lens.key}`,
       phase: 'Reviews', schema: reviewSchema,
     })
@@ -594,7 +607,7 @@ for (const repo of repos) {
   // recompute the scores (those come from reconcileScores above)
   log(`${tag}: synthesis - writing memo`)
   const synthesis = await agent(
-    synthesisPrompt(repo, profile, flavor, reviews, scores),
+    synthesisPrompt(repo, profile, flavor, reviews, scores, outBase),
     {
       label: `synthesis:${repo.path}`,
       phase: 'Synthesis',

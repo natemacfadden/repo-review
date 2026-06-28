@@ -34,17 +34,21 @@ company/role). Do not pre-parse.
 ## Run
 
 **Preferred - Workflow orchestration.** If the Workflow tool is available (this
-command invocation is your authorization), use it:
+command invocation is your authorization), use it. First run `pwd` to capture
+the absolute invocation directory, then append `--out "<pwd>/repo-review-out"`
+to the arguments so review docs land deterministically there - not inside a
+lens agent's temp clone (which gets deleted). Replace `<pwd>` with the actual
+path and keep the quotes in case it contains spaces:
 
 ```
 Workflow({
   scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/repo-review.js",
-  args: "$ARGUMENTS"
+  args: "$ARGUMENTS --out \"<pwd>/repo-review-out\""
 })
 ```
 
 The workflow also accepts a structured object, so an agent invoking it
-programmatically can skip the string entirely:
+programmatically can skip the string entirely (pass `outDir` directly):
 
 ```
 Workflow({
@@ -52,12 +56,14 @@ Workflow({
   args: {
     repos: [{ path: "./a", flavor: "performance" }, { path: "./b" }],
     profile: "job",
-    specialization: "a RE role at Anthropic"
+    specialization: "a RE role at Anthropic",
+    outDir: "<pwd>/repo-review-out"
   }
 })
 ```
 
-Both forms normalize to the same `{ repos, profile, specialization }`.
+Both forms normalize to `{ repos, profile, specialization, outDir }`. If `outDir`
+is omitted the output base falls back to a relative `repo-review-out`.
 
 **Fallback** (no Workflow tool). The Workflow engine is only deterministic
 orchestration - the reviewing is agent work, so reproduce the structure with
@@ -72,7 +78,9 @@ verdict scale, and write its per-lens doc. Then reconcile the scores yourself
 - lens-weighted: the owning lens counts double on its own axis; honesty and
 overall are a plain mean - and write the memo (verdict, outliers,
 disagreements, consensus, oversell/undersell call, fixes) to
-`repo-review-out/<repo>/MEMO.md`.
+`<pwd>/repo-review-out/<repo>/MEMO.md` - an absolute path anchored at the
+invocation directory (`pwd`), and likewise the per-lens docs, so they survive
+each reviewer's temp-clone cleanup.
 
 If you cannot spawn subagents, do it inline as a single reviewer across the
 five lenses - lower fidelity; note the reduced independence.
