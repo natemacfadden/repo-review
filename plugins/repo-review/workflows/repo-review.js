@@ -14,8 +14,9 @@ export const meta = {
     'args = { repoPath, profile?, ...overrides } or a bare repo-path string. ' +
     'Default profile is a general code-quality review.',
   phases: [
-    { title: 'Reviews', detail: 'one reviewer per lens' },
-    { title: 'Synthesis', detail: 'reconcile scores + write the memo' },
+    { title: 'Detect', detail: 'per-repo flavor detection (when not given)' },
+    { title: 'Reviews', detail: 'five lens reviewers per repo, in parallel' },
+    { title: 'Synthesis', detail: 'reconcile (code) + write the memo' },
   ],
 }
 
@@ -155,6 +156,102 @@ function reconcileScores(reviews) {
 }
 // <<< pure
 
-// TODO(port): CORE lenses, clone/build/run machinery, schemas, orchestration
-// TODO(port): PROFILE overlay selected by args.profile (default: general)
-throw new Error('repo-review workflow not yet implemented - scaffold only')
+// ---- lenses (CORE) -------------------------------------------------------
+const LENSES = [
+  { key: 'performance', title: 'Performance & benchmarking rigor' },
+  { key: 'correctness', title: 'Correctness & validity' },
+  { key: 'engineering', title: 'Engineering maturity' },
+  { key: 'taste', title: 'Taste & positioning' },
+  { key: 'documentation', title: 'Documentation & onboarding UX' },
+]
+
+// ---- schemas (TODO: flesh out fields) ------------------------------------
+const SCORE_PROPS = Object.fromEntries(
+  SCORE_AXES.map(a => [a, { type: 'number', minimum: 1, maximum: 10 }]),
+)
+const DETECT_SCHEMA = {
+  type: 'object',
+  required: ['flavor'],
+  properties: {
+    flavor: { type: 'string', enum: KNOWN_FLAVORS },
+    rationale: { type: 'string' },
+  },
+}
+const REVIEW_SCHEMA = {
+  type: 'object',
+  required: ['scores', 'review'],
+  properties: {
+    scores: { type: 'object', required: SCORE_AXES, properties: SCORE_PROPS },
+    review: { type: 'string', description: 'per-lens review markdown doc' },
+  },
+}
+const SYNTHESIS_SCHEMA = {
+  type: 'object',
+  required: ['memo', 'verdict'],
+  properties: {
+    memo: { type: 'string', description: 'consolidated memo markdown doc' },
+    verdict: { type: 'string' },
+    outliers: { type: 'array', items: { type: 'string' } },
+  },
+}
+
+// ---- prompt builders (TODO: flesh out the actual prompt content) ---------
+function detectPrompt(repo) {
+  return `TODO: inspect ${repo.path} and classify its flavor ` +
+    `(one of: ${KNOWN_FLAVORS.join(', ')}).`
+}
+function reviewPrompt(repo, lens, profile, flavor) {
+  return `TODO: review ${repo.path} through the ${lens.title} lens, as a ` +
+    `${profile.label} (flavor: ${flavor || 'balanced'}). Score every axis ` +
+    `and write a per-lens review doc.`
+}
+function synthesisPrompt(repo, profile, flavor, reviews, scores) {
+  return `TODO: synthesize ${reviews.length} reviews of ${repo.path} into a ` +
+    `${profile.label} memo. Use the precomputed reconciled scores (do not ` +
+    `recompute); identify outliers; write the memo doc.`
+}
+
+// ---- orchestration: per repo, detect -> reviews -> synthesis -------------
+const { repos, profile: profileName } = normalizeArgs(args)
+const profile = resolveProfile(profileName)
+if (!repos.length) return { error: 'no repositories given', profile: profile.name }
+log(`repo-review: ${repos.length} repo(s), profile ${profile.name}`)
+
+const results = await pipeline(
+  repos,
+  // stage 1: resolve flavor - detect only when not given inline
+  async (repo) => {
+    let flavor = repo.flavor
+    if (!flavor) {
+      const d = await agent(detectPrompt(repo), {
+        label: `detect:${repo.path}`, phase: 'Detect', schema: DETECT_SCHEMA,
+      })
+      flavor = (d && d.flavor) || null
+    }
+    return { repo, flavor }
+  },
+  // stage 2: five lens reviewers in parallel, then code-side reconcile
+  async ({ repo, flavor }) => {
+    const reviews = await parallel(LENSES.map(lens => () =>
+      agent(reviewPrompt(repo, lens, profile, flavor), {
+        label: `review:${repo.path}:${lens.key}`,
+        phase: 'Reviews', schema: REVIEW_SCHEMA,
+      }).then(r => (r ? { ...r, lens: lens.key } : null))))
+    const ok = reviews.filter(Boolean)
+    return { repo, flavor, reviews: ok, scores: reconcileScores(ok) }
+  },
+  // stage 3: synthesis agent narrates (does not recompute) + writes the memo
+  async ({ repo, flavor, reviews, scores }) => {
+    const synthesis = await agent(
+      synthesisPrompt(repo, profile, flavor, reviews, scores),
+      {
+        label: `synthesis:${repo.path}`,
+        phase: 'Synthesis',
+        schema: SYNTHESIS_SCHEMA,
+      },
+    )
+    return { repo: repo.path, flavor, scores, synthesis }
+  },
+)
+
+return { profile: profile.name, repos: results.filter(Boolean) }

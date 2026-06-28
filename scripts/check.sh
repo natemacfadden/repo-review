@@ -43,18 +43,16 @@ for f in \
 done
 [ "$json_ok" -eq 1 ] && ok json || bad json
 
-# 4. workflow js syntax (ESM; checked via stdin so no package "type" needed)
+# 4. workflow syntax: parse as the runtime loads it (meta extracted, body as an
+# async function - top-level await/return legal). see scripts/checks.
 section "workflow syntax"
 if command -v node >/dev/null 2>&1; then
-  syn=1
-  for f in plugins/repo-review/workflows/*.js; do
-    if node --check --input-type=module < "$f"; then
-      printf '  ok   %s\n' "$f"
-    else
-      printf '  bad  %s\n' "$f"; syn=0
-    fi
-  done
-  [ "$syn" -eq 1 ] && ok "workflow syntax" || bad "workflow syntax"
+  WF=plugins/repo-review/workflows
+  if node scripts/checks/workflow-syntax.mjs "$WF"/*.js; then
+    ok "workflow syntax"
+  else
+    bad "workflow syntax"
+  fi
 else
   skip "workflow syntax (node not found - activate the conda env)"
 fi
