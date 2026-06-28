@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "repo-review",
+  "description": "Clone, build, run, and review a code repo across five lenses; synthesize a scored review.",
+  "owner": {
+    "name": "Nate MacFadden",
+    "email": "natemacfadden@gmail.com"
+  },
+  "metadata": {
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "repo-review",
+      "description": "Clone, build, run, and review a code repo across five lenses; synthesize a scored review under a selectable profile (default: general code-quality).",
+      "source": "./plugins/repo-review",
+      "category": "development",
+      "keywords": ["code-review", "repo", "multi-agent", "workflow", "portfolio"]
+    }
+  ]
+}

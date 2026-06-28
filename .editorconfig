@@ -1,0 +1,17 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# code and prose hard-wrap at 88
+[*.{js,md}]
+max_line_length = 88
+
+# json/yaml description values are single, unwrappable strings - no length cap
+[*.{json,yml,yaml}]
+max_line_length = off

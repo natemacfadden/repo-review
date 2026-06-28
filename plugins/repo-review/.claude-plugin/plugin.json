@@ -1,0 +1,9 @@
+{
+  "name": "repo-review",
+  "description": "Clone, build, and run a code repo, then review it across five lenses (performance, correctness, engineering, taste & positioning, documentation) and synthesize a scored review. The evaluative profile is swappable; the default is a general code-quality review, and other profiles retarget the framing to specific audiences.",
+  "author": {
+    "name": "Nate MacFadden",
+    "email": "natemacfadden@gmail.com"
+  },
+  "homepage": "https://github.com/natemacfadden/repo-review"
+}
