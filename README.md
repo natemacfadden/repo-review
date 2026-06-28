@@ -18,9 +18,10 @@ Run these as slash commands inside a Claude Code session (not a shell):
 ```
 /plugin marketplace add natemacfadden/repo-review
 /plugin install repo-review@repo-review
+/reload-plugins
 ```
 
-Then, in the same session:
+`/reload-plugins` activates it in the current session without a restart. Then:
 
 ```
 /repo-review <repo-path>[:flavor]... [--profile <name>] [--for "<text>"]
@@ -36,6 +37,21 @@ Then, in the same session:
 Flavor (what the repo is for - tunes per-lens expectations) is resolved per
 repo: an explicit `:flavor` if given, else auto-detected from the repo. Values:
 `performance`, `research`, `production`, `personal`.
+
+## Uninstall
+
+Run as slash commands inside a Claude Code session:
+
+```
+/plugin uninstall repo-review@repo-review
+/plugin marketplace remove repo-review
+/reload-plugins
+```
+
+Removing the marketplace also uninstalls any plugin installed from it, so the
+first line is optional. `/reload-plugins` applies the removal to the current
+session without a restart. Nothing here touches the source repo - plugin state
+lives only in `~/.claude/`.
 
 ## Layout
 
