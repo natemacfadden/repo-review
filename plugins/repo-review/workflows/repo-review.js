@@ -321,7 +321,7 @@ const LENSES = [
   },
 ]
 
-// ---- schemas (TODO: flesh out fields) ------------------------------------
+// ---- schemas (built per-run; recommendation/verdict use profile.verdicts) -
 const SCORE_PROPS = Object.fromEntries(
   SCORE_AXES.map(a => [a, { type: 'number', minimum: 1, maximum: 10 }]),
 )
@@ -352,17 +352,27 @@ function buildReviewSchema(profile) {
     },
   }
 }
-const SYNTHESIS_SCHEMA = {
-  type: 'object',
-  required: ['memo', 'verdict'],
-  properties: {
-    memo: { type: 'string', description: 'consolidated memo markdown doc' },
-    verdict: { type: 'string' },
-    outliers: { type: 'array', items: { type: 'string' } },
-  },
+// built per-run so `verdict` validates against the profile's verdicts.
+function buildSynthesisSchema(profile) {
+  const strs = { type: 'array', items: { type: 'string' } }
+  return {
+    type: 'object',
+    required: ['memo', 'verdict', 'outliers'],
+    properties: {
+      memo: { type: 'string', description: 'consolidated memo markdown doc' },
+      verdict: { type: 'string', enum: profile.verdicts },
+      provenance: { type: 'string', description: 'commit(s) reviewed' },
+      outliers: strs,
+      disagreements: strs,
+      consensusStrengths: strs,
+      consensusWeaknesses: strs,
+      oversellAssessment: { type: 'string' },
+      fixes: strs,
+    },
+  }
 }
 
-// ---- prompt builders (TODO: flesh out the actual prompt content) ---------
+// ---- prompt builders -----------------------------------------------------
 function detectPrompt(repo) {
   return [
     `You are classifying the INTENT of the repository at \`${repo.path}\` - ` +
@@ -451,9 +461,67 @@ function reviewPrompt(repo, lens, profile, flavor) {
   ].join('\n\n')
 }
 function synthesisPrompt(repo, profile, flavor, reviews, scores) {
-  return `TODO: synthesize ${reviews.length} reviews of ${repo.path} into a ` +
-    `${profile.label} memo. Use the precomputed reconciled scores (do not ` +
-    `recompute); identify outliers; write the memo doc.`
+  const slug = repoSlug(repo.path)
+  const memoPath = `${OUTDIR}/${slug}/MEMO.md`
+  const verdicts = profile.verdicts.join(', ')
+  const compact = reviews.map(r => ({
+    lens: r.lens,
+    scores: r.scores,
+    recommendation: r.recommendation,
+    strengths: r.strengths,
+    weaknesses: r.weaknesses,
+    oversellAssessment: r.oversellAssessment,
+    testsWritten: r.testsWritten,
+    reviewedCommit: r.reviewedCommit,
+  }))
+  return [
+    `You are the synthesizing chair consolidating ${reviews.length} ` +
+      `independent lens reviews of the repository ${repo.path}, evaluated ` +
+      `as ${profile.label}. Your job is to ${profile.purpose}, judged ` +
+      `against ${profile.bar}. Repo intent (flavor): ` +
+      `${describeFlavor(flavor)}.`,
+    'Synthesize from the reviews BELOW ONLY. Do NOT clone, open, build, or ' +
+      'inspect the repository or any local files - your working directory ' +
+      'may contain an unrelated project. Base every statement on the ' +
+      'structured reviews.',
+    'PROVENANCE - the reviewers each recorded the commit they reviewed; ' +
+      'these may not agree. Determine provenance from their reviewedCommit ' +
+      'fields:\n' +
+      '- all the same hash  -> report that single hash.\n' +
+      '- they differ        -> report each hash and FLAG it: the repo may ' +
+      'have changed mid-run, so scores are not strictly comparable.\n' +
+      '- "non-git snapshot" -> report "non-git snapshot" (no commit).',
+    'The per-axis scores are ALREADY reconciled in code (lens-weighted). ' +
+      'Use these numbers verbatim - do NOT recompute or re-average:\n' +
+      JSON.stringify(scores, null, 2),
+    `The ${reviews.length} lens reviews (lens, scores, recommendation, ` +
+      'strengths, weaknesses, oversell assessment, tests written, ' +
+      'reviewedCommit):\n' +
+      JSON.stringify(compact, null, 2),
+    'Produce one consolidated memo:\n' +
+      `- VERDICT: one of ${verdicts}.\n` +
+      '- OUTLIERS (required): for any axis where a reviewer diverges ' +
+      'materially from the others (see the ranges), name the reviewer, the ' +
+      'axis, and why - misread, lens bias, or a real signal others missed? ' +
+      'Do not skip this.\n' +
+      '- DISAGREEMENTS: genuine substantive disagreements worth surfacing.\n' +
+      '- CONSENSUS strengths and weaknesses: items multiple reviewers ' +
+      'independently flagged, or that are clearly material.\n' +
+      '- OVERSELL/UNDERSELL: an explicit calibration call (drawing on the ' +
+      'honesty axis and the oversell assessments).\n' +
+      '- FIXES: a prioritized, actionable punch-list; tag each with impact ' +
+      `(what ${profile.audience} sees) and effort (minutes / hours / >1 ` +
+      'day).',
+    `WRITE THE MEMO DOC: save the full markdown memo to ${memoPath}, ` +
+      'opening with the provenance line (per the rules above), then: a ' +
+      'one-paragraph verdict; a per-axis reconciled-score table with ranges; ' +
+      'consensus strengths; consensus weaknesses/red flags; outliers; ' +
+      'disagreements; the oversell/undersell call; the Fixes section; and ' +
+      'the final recommendation tied to the purpose. This memo is the ' +
+      'human-readable deliverable.',
+    'Return your result via the structured-output tool, populating every ' +
+      'field.',
+  ].join('\n\n')
 }
 
 // ---- orchestration -------------------------------------------------------
@@ -464,6 +532,7 @@ const { repos, profile: profileName, specialization } = normalizeArgs(args)
 const profile = resolveProfile(profileName, specialization)
 if (!repos.length) return { error: 'no repositories given', profile: profile.name }
 const reviewSchema = buildReviewSchema(profile)
+const synthesisSchema = buildSynthesisSchema(profile)
 log(`repo-review: ${repos.length} repo(s), profile ${profile.name}`)
 
 const results = []
@@ -497,7 +566,7 @@ for (const repo of repos) {
     {
       label: `synthesis:${repo.path}`,
       phase: 'Synthesis',
-      schema: SYNTHESIS_SCHEMA,
+      schema: synthesisSchema,
     },
   )
 
