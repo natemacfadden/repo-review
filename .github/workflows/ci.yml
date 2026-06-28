@@ -12,8 +12,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # installs devDependencies (editorconfig-checker) into node_modules.
-      # switch to `npm ci` once package-lock.json is committed.
-      - run: npm install
+      # clean, lockfile-exact install (package-lock.json is committed)
+      - run: npm ci
+      # claude CLI provides `plugin validate`; installs to ~/.local/bin, which
+      # is not on PATH by default, so export it for later steps
+      - name: install claude cli
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # fail loudly if install/PATH broke, so check.sh can't silently SKIP it
+      - name: assert claude present
+        run: command -v claude && claude --version
       # same entry point developers run locally
       - run: bash scripts/check.sh
