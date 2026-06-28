@@ -68,6 +68,33 @@ first line is optional. `/reload-plugins` applies the removal to the current
 session without a restart. Nothing here touches the source repo - plugin state
 lives only in `~/.claude/`.
 
+## Architecture
+
+Two layers, on purpose:
+
+- **Command / skill** (`commands/review.md` -> `/repo-review:review`) - the
+  user-facing entry point. It parses the arguments, runs `pwd` to capture the
+  invocation directory, injects `--out`, serves `--help`/usage, then hands a
+  fully-formed call to the engine.
+- **Workflow engine** (`lib/repo-review.js`) - Anthropic's deterministic
+  *workflow* construct, which does the orchestration: it spawns the worker
+  agents, reconciles their scores in code, and drives the synthesis.
+
+In model terms: the command is a **doorman** that interprets the request and
+sets up the arguments and output path; the engine then spawns the models that
+actually think - a flavor detector, five **independent** lens reviewers (each
+in its own clone, so the takes stay unbiased), and a synthesizer that writes
+the memo. Score reconciliation between reviewers is plain code, not a model.
+
+**Why have the command at all, instead of just the workflow?** The workflow
+runs in a restricted, deterministic sandbox and is invoked programmatically by
+path with a fixed `args` object - it can't read the environment (e.g. the
+current directory, which we need so output lands deterministically) or present
+a CLI. The command is the thin, agent-driven adapter that gathers that context
+plus the user's input and translates it into a proper workflow call. So it
+isn't redundant with the engine - it does the setup the sandboxed engine
+structurally cannot.
+
 ## Layout
 
 ```
