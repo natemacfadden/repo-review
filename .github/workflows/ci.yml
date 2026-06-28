@@ -12,8 +12,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # clean, lockfile-exact install (package-lock.json is committed)
-      - run: npm ci
       # claude CLI provides `plugin validate`; installs to ~/.local/bin, which
       # is not on PATH by default, so export it for later steps
       - name: install claude cli

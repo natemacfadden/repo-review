@@ -19,14 +19,13 @@ skip() { printf 'SKIP: %s\n' "$1"; }
 section "ascii"
 if bash scripts/asciicheck.sh; then ok ascii; else bad ascii; fi
 
-# 2. editorconfig (line width, whitespace, final newline)
+# 2. editorconfig (line width, whitespace, final newline, indent) - our own
+# self-contained checker; no binary download (see scripts/checks).
 section "editorconfig"
-if [ -x node_modules/.bin/editorconfig-checker ]; then
-  if node_modules/.bin/editorconfig-checker; then ok editorconfig; else bad editorconfig; fi
-elif command -v npx >/dev/null 2>&1; then
-  if npx --yes editorconfig-checker; then ok editorconfig; else bad editorconfig; fi
+if command -v node >/dev/null 2>&1; then
+  if node scripts/checks/editorconfig.mjs; then ok editorconfig; else bad editorconfig; fi
 else
-  skip "editorconfig (node/npx not found - activate the conda env)"
+  skip "editorconfig (node not found - activate the conda env)"
 fi
 
 # 3. json manifests parse

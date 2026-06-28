@@ -14,6 +14,11 @@ else
   mapfile -d '' files < <(find . -type f -not -path './.git/*' -print0)
 fi
 
+# drop listed-but-absent paths (e.g. a tracked file deleted in the working tree)
+existing=()
+for f in "${files[@]}"; do [ -f "$f" ] && existing+=("$f"); done
+files=("${existing[@]}")
+
 if [ ${#files[@]} -eq 0 ]; then echo "asciicheck: no files"; exit 0; fi
 
 # -I skips binary files; /dev/null forces filename:line output for a lone file

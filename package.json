@@ -6,8 +6,5 @@
   "scripts": {
     "check": "bash scripts/check.sh",
     "test": "node --test"
-  },
-  "devDependencies": {
-    "editorconfig-checker": ">=5"
   }
 }
