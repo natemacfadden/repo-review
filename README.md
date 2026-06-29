@@ -9,8 +9,6 @@ synthesizes a scored review. Two overlays tune the review: a **profile** (who is
 judging and how to grade; default a general code-quality review) and a
 **flavor** (what the repo is for, e.g. high-performance vs. personal).
 
-> **Status:** in development - workflow logic in progress.
-
 ## Install
 
 Run these as slash commands inside a Claude Code session (not a shell):
