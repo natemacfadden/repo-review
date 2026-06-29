@@ -62,6 +62,23 @@ tokens itself (see Usage above). Do not pre-parse the repos or flags yourself.
 
 ## Run
 
+**Confirm inputs and cost before launching.** This is an expensive,
+long-running operation, so do NOT launch it silently. First summarize what will
+run and flag any review-shaping fields the user left unspecified, with their
+defaults:
+- profile (default `general`; alternatives `job`, `oss-audit`,
+  `student-project`) - sets the audience and verdict scale
+- specialization via `--for` (default none) - e.g. a target role for `job`
+- each repo's flavor (auto-detected unless pinned as `path:flavor`)
+
+Ask whether the user wants to set any of these or proceed with the defaults.
+Also state the estimated cost - roughly 1-2 hours and 40-60 USD per repo on
+metered API pricing (heavily subsidized on a Claude subscription; within a
+100 USD/mo Max plan), scaled by the repo count. Only launch once the user
+explicitly confirms; if they decline, stop without running. You may inspect the
+arguments to see which flags are present, but pass them through unchanged - the
+workflow does the real parsing.
+
 **Preferred - Workflow orchestration.** If the Workflow tool is available (this
 command invocation is your authorization), use it. First run `pwd` to capture
 the absolute invocation directory, then append `--out "<pwd>/repo-review-out"`
