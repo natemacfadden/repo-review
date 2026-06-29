@@ -40,7 +40,7 @@ Examples:
 /repo-review:review ~/code/foo --profile oss-audit --out ~/reviews
 ```
 
-**If `$ARGUMENTS` is `--help` or `-h` (or no repo path is given), print the
+**If the arguments are `--help` or `-h` (or no repo path is given), print the
 Usage section above and STOP - do not start a review.**
 
 ## Cost & expectations
@@ -50,15 +50,15 @@ This is **thorough and token-heavy by design**: every lens clones, builds, and
 Budget very roughly **~15-20M tokens per repo** (overwhelmingly cache reads
 from those long sessions), ~100k output tokens, and **~1-2 hours per repo**.
 
-On **metered API pricing** that is ~$40-60 per repo (Opus; scales with repo
+On **metered API pricing** that is ~40-60 USD per repo (Opus; scales with repo
 size and lens count). On a **Claude subscription this is heavily subsidized** -
 usage is included rather than billed per token, so a run like this fits
-comfortably within a **$100/mo Claude Max plan** and can be run there easily.
+comfortably within a **100 USD/mo Claude Max plan** and can be run there easily.
 The cost is dominated by the per-lens code-running review itself, not by waste
 - it is the price of the depth. Prefer overnight runs for multi-repo batches.
 
-Pass `$ARGUMENTS` through to the workflow unchanged - it parses the tokens
-itself (see Usage above). Do not pre-parse the repos or flags yourself.
+Pass the command arguments through to the workflow unchanged - it parses the
+tokens itself (see Usage above). Do not pre-parse the repos or flags yourself.
 
 ## Run
 
