@@ -1,6 +1,5 @@
 // repo-review - clone + build + run a repo, review across five lenses, synthesize
 //
-// STUB. structure only; logic ported in a later step.
 // design: CORE lenses + clone/build/run, with a swappable PROFILE overlay
 
 export const meta = {
@@ -246,8 +245,10 @@ function repoSlug(path) {
 }
 // <<< pure
 
-// where per-lens reviews and memos are written (outside the temp clones, which
-// get deleted). TODO: make overridable via args.
+// fallback output base, used only when the command passes no --out: per-lens
+// reviews and memos are written here (outside the temp clones, which get
+// deleted). normally the command passes an absolute --out, so the run uses
+// outBase = outDir || OUTDIR.
 const OUTDIR = 'repo-review-out'
 
 // ---- lenses (CORE) -------------------------------------------------------

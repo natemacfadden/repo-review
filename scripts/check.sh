@@ -68,7 +68,7 @@ else
   skip "meta (node not found - activate the conda env)"
 fi
 
-# 5. plugin + marketplace manifest structure
+# 6. plugin + marketplace manifest structure
 section "plugin validate"
 if command -v claude >/dev/null 2>&1; then
   if claude plugin validate . --strict < /dev/null; then
