@@ -406,6 +406,17 @@ function reviewPrompt(repo, lens, profile, flavor, outBase) {
   const tmp = `/tmp/rr-${slug}-${lens.key}`
   const outPath = `${outBase}/${slug}/${lens.key}.md`
   const verdicts = profile.verdicts.join(', ')
+  // profiling is core to the performance lens (and engineering, for repro);
+  // for the other lenses it is optional - encouraged where it sharpens their
+  // angle, but they should not feel obligated to profile.
+  const mustProfile = lens.key === 'performance' || lens.key === 'engineering'
+  const profileLine = mustProfile
+    ? '- PROFILE the code yourself (cProfile/pprofile for Python, or a ' +
+      'profiler appropriate to the stack) to find where time actually ' +
+      'goes - expected for your lens; do not take perf claims on faith.'
+    : '- You are free to profile if it would sharpen your lens, but it is ' +
+      'not required - do not profile out of obligation; spend effort where ' +
+      'your lens pays off.'
   return [
     `You are ${profile.audience}. You are reviewing the repository at ` +
       `\`${repo.path}\`, and your job is to ${profile.purpose}. Judge it ` +
@@ -436,9 +447,7 @@ function reviewPrompt(repo, lens, profile, flavor, outBase) {
       'and (where relevant) performance - go BEYOND the tests the repo ' +
       'ships. This is required, not optional. Report what you wrote and ' +
       'what it showed.\n' +
-      '- For performance, actually PROFILE the code yourself ' +
-      '(cProfile/pprofile for Python, or a profiler appropriate to the ' +
-      'stack) to find where time goes - do not take claims on faith.\n' +
+      profileLine + '\n' +
       '- Note additional validation/tests the authors should add.',
     'MACHINE IS RAM-LIMITED: before any heavy build/run, check available ' +
       'memory (e.g. free -m). If memory is tight or an op risks an OOM ' +
