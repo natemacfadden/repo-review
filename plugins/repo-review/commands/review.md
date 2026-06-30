@@ -36,7 +36,11 @@ review.
   - `--profile oss-audit --for "using this as a core production dependency"`
 - **`--out <dir>`** - absolute base for the output docs (default
   `<invocation-dir>/repo-review-out`); each repo writes
-  `<out>/<repo>/{<lens>.md, MEMO.md}`.
+  `<out>/<repo>/[<stamp>/]{<lens>.md, MEMO.md}`.
+- **`--stamp <token>`** - a run-unique token (a timestamp) nested under each
+  repo's dir so re-runs don't clobber earlier ones:
+  `<out>/<repo>/<stamp>/...`. Normally supplied automatically by this command;
+  omit it and docs land directly in `<out>/<repo>/`.
 
 Examples:
 
@@ -89,23 +93,27 @@ arguments to see which flags are present, but pass them through unchanged - the
 workflow does the real parsing.
 
 **Preferred - Workflow orchestration.** If the Workflow tool is available (this
-command invocation is your authorization), use it. First run `pwd` to capture
-the absolute invocation directory, then append `--out "<pwd>/repo-review-out"`
-to the arguments so review docs land deterministically there - not inside a
-lens agent's temp clone (which gets deleted). Replace `<pwd>` with the actual
-path and keep the quotes in case it contains spaces:
+command invocation is your authorization), use it. First run
+`pwd` and `date -u +%Y%m%dT%H%M%SZ` to capture the absolute invocation
+directory and a run timestamp, then append both `--out "<pwd>/repo-review-out"`
+(so review docs land deterministically there - not inside a lens agent's temp
+clone, which gets deleted) and `--stamp <timestamp>` (so a re-run nests under a
+fresh dir instead of clobbering the previous run). Replace `<pwd>` and
+`<timestamp>` with the actual values and keep the quotes in case the path has
+spaces:
 
 ```
 Workflow({
   scriptPath: "${CLAUDE_PLUGIN_ROOT}/lib/repo-review.js",
-  args: "$ARGUMENTS --out \"<pwd>/repo-review-out\""
+  args: "$ARGUMENTS --out \"<pwd>/repo-review-out\" --stamp <timestamp>"
 })
 ```
 
 Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
-with `--out` appended. The engine does the parsing (see Usage above); do not
-restructure the arguments into an object yourself. If `--out` is omitted the
-output base falls back to a relative `repo-review-out`.
+with `--out` and `--stamp` appended. The engine does the parsing (see Usage
+above); do not restructure the arguments into an object yourself. If `--out` is
+omitted the output base falls back to a relative `repo-review-out`; if `--stamp`
+is omitted docs land directly in `<out>/<repo>/`.
 
 **Fallback** (no Workflow tool). The Workflow engine is only deterministic
 orchestration - the reviewing is agent work, so reproduce the structure with

@@ -3,11 +3,16 @@ import assert from 'node:assert/strict'
 import { loadPure } from './extract.mjs'
 
 const WF = 'plugins/repo-review/lib/repo-review.js'
-const { splitRepoToken, parseArgs, normalizeArgs, repoSlug } = loadPure(WF, [
+const {
+  splitRepoToken, parseArgs, normalizeArgs, repoSlug, repoOutDir,
+  findSlugCollisions,
+} = loadPure(WF, [
   'splitRepoToken',
   'parseArgs',
   'normalizeArgs',
   'repoSlug',
+  'repoOutDir',
+  'findSlugCollisions',
 ])
 
 test('repoSlug: takes the last path segment, sanitized', () => {
@@ -17,6 +22,30 @@ test('repoSlug: takes the last path segment, sanitized', () => {
   assert.equal(repoSlug('a b'), 'a-b')
   assert.equal(repoSlug('.'), 'repo')
   assert.equal(repoSlug(''), 'repo')
+})
+
+test('repoOutDir: base path, with stamp nested + sanitized beneath', () => {
+  assert.equal(repoOutDir('/out', 'foo'), '/out/foo')
+  assert.equal(repoOutDir('/out', 'foo', null), '/out/foo')
+  assert.equal(repoOutDir('/out', 'foo', '20260630T184500Z'),
+    '/out/foo/20260630T184500Z')
+  // the stamp is sanitized like a slug (unsafe chars -> '-')
+  assert.equal(repoOutDir('/out', 'foo', 'run 7'), '/out/foo/run-7')
+})
+
+test('findSlugCollisions: groups distinct repos sharing a slug', () => {
+  const cols = findSlugCollisions([
+    { path: 'a/foo' }, { path: 'b/foo' }, { path: 'c/bar' },
+  ])
+  assert.equal(cols.length, 1)
+  assert.equal(cols[0].slug, 'foo')
+  assert.deepEqual(cols[0].paths.sort(), ['a/foo', 'b/foo'])
+})
+
+test('findSlugCollisions: none when unique; safe on empty/garbage', () => {
+  assert.deepEqual(findSlugCollisions([{ path: './a' }, { path: './b' }]), [])
+  assert.deepEqual(findSlugCollisions([]), [])
+  assert.deepEqual(findSlugCollisions(null), [])
 })
 
 test('splitRepoToken: bare path -> no flavor', () => {
@@ -38,11 +67,14 @@ test('splitRepoToken: windows drive letter survives', () => {
   assert.deepEqual(splitRepoToken('C:/repo'), { path: 'C:/repo', flavor: null })
 })
 
+const EMPTY = {
+  repos: [], profile: null, specialization: null, outDir: null, stamp: null,
+}
+
 test('parseArgs: empty -> no repos, profile, specialization, outDir', () => {
-  const empty = { repos: [], profile: null, specialization: null, outDir: null }
-  assert.deepEqual(parseArgs(''), empty)
-  assert.deepEqual(parseArgs('   '), empty)
-  assert.deepEqual(parseArgs(null), empty)
+  assert.deepEqual(parseArgs(''), EMPTY)
+  assert.deepEqual(parseArgs('   '), EMPTY)
+  assert.deepEqual(parseArgs(null), EMPTY)
 })
 
 test('parseArgs: multiple repos with per-repo flavors', () => {
@@ -55,6 +87,7 @@ test('parseArgs: multiple repos with per-repo flavors', () => {
     profile: null,
     specialization: null,
     outDir: null,
+    stamp: null,
   })
 })
 
@@ -64,6 +97,7 @@ test('parseArgs: --profile with a value, anywhere', () => {
     profile: 'job',
     specialization: null,
     outDir: null,
+    stamp: null,
   })
 })
 
@@ -73,6 +107,7 @@ test('parseArgs: --profile=value form', () => {
     profile: 'job',
     specialization: null,
     outDir: null,
+    stamp: null,
   })
 })
 
@@ -82,6 +117,7 @@ test('parseArgs: --profile with no value is ignored', () => {
     profile: null,
     specialization: null,
     outDir: null,
+    stamp: null,
   })
 })
 
@@ -91,6 +127,7 @@ test('parseArgs: unknown flags are ignored, not treated as repos', () => {
     profile: null,
     specialization: null,
     outDir: null,
+    stamp: null,
   })
 })
 
@@ -101,6 +138,7 @@ test('parseArgs: --for captures a quoted multi-word value', () => {
     profile: 'job',
     specialization: 'a RE role at Anthropic',
     outDir: null,
+    stamp: null,
   })
 })
 
@@ -122,6 +160,21 @@ test('parseArgs: --out with no value is ignored', () => {
   assert.equal(parseArgs('./a --out').outDir, null)
 })
 
+test('parseArgs: --stamp captures a value; --stamp= form too', () => {
+  assert.equal(parseArgs('./a --stamp 20260630T184500Z').stamp,
+    '20260630T184500Z')
+  assert.equal(parseArgs('./a --stamp=run7').stamp, 'run7')
+})
+
+test('parseArgs: --stamp with no value is ignored', () => {
+  assert.equal(parseArgs('./a --stamp').stamp, null)
+})
+
+test('parseArgs: empty-path repos (a quoted "") are dropped', () => {
+  // parity with the structured-object branch, which filters pathless items.
+  assert.deepEqual(parseArgs('"" ./a').repos, [{ path: './a', flavor: null }])
+})
+
 test('parseArgs: quotes keep a value together; repos still parse', () => {
   const out = parseArgs("'./a b' --for 'x y'")
   assert.deepEqual(out.repos, [{ path: './a b', flavor: null }])
@@ -134,30 +187,32 @@ test('normalizeArgs: string delegates to parseArgs', () => {
 })
 
 test('normalizeArgs: null/undefined -> empty', () => {
-  const empty = { repos: [], profile: null, specialization: null, outDir: null }
-  assert.deepEqual(normalizeArgs(null), empty)
-  assert.deepEqual(normalizeArgs(undefined), empty)
+  assert.deepEqual(normalizeArgs(null), EMPTY)
+  assert.deepEqual(normalizeArgs(undefined), EMPTY)
 })
 
-test('normalizeArgs: structured object passes through (incl outDir)', () => {
+test('normalizeArgs: structured object passes through (incl outDir, stamp)', () => {
   assert.deepEqual(
     normalizeArgs({
       repos: [{ path: './a', flavor: 'personal' }],
       profile: 'job',
       specialization: 'team X',
       outDir: '/abs/out',
+      stamp: 'run9',
     }),
     {
       repos: [{ path: './a', flavor: 'personal' }],
       profile: 'job',
       specialization: 'team X',
       outDir: '/abs/out',
+      stamp: 'run9',
     },
   )
 })
 
-test('normalizeArgs: non-string outDir coerced to null', () => {
+test('normalizeArgs: non-string outDir/stamp coerced to null', () => {
   assert.equal(normalizeArgs({ repos: ['./a'], outDir: 42 }).outDir, null)
+  assert.equal(normalizeArgs({ repos: ['./a'], stamp: 42 }).stamp, null)
 })
 
 test('normalizeArgs: string repo items are split', () => {
@@ -169,6 +224,7 @@ test('normalizeArgs: string repo items are split', () => {
     profile: null,
     specialization: null,
     outDir: null,
+    stamp: null,
   })
 })
 
@@ -178,13 +234,13 @@ test('normalizeArgs: unknown flavor coerced to null', () => {
     profile: null,
     specialization: null,
     outDir: null,
+    stamp: null,
   })
 })
 
 test('normalizeArgs: bad repos shape -> empty; pathless items dropped', () => {
-  const empty = { repos: [], profile: null, specialization: null, outDir: null }
-  assert.deepEqual(normalizeArgs({ repos: 'nope' }), empty)
-  assert.deepEqual(normalizeArgs({ repos: [{ flavor: 'personal' }] }), empty)
+  assert.deepEqual(normalizeArgs({ repos: 'nope' }), EMPTY)
+  assert.deepEqual(normalizeArgs({ repos: [{ flavor: 'personal' }] }), EMPTY)
 })
 
 test('normalizeArgs: JSON-stringified object is recovered, not tokenized', () => {

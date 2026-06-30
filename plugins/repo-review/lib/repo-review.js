@@ -18,7 +18,7 @@ export const meta = {
 // plugin version - bump on every behavior change and keep in sync with
 // .claude-plugin/plugin.json (check.sh enforces the match). printed at the
 // start of every run so logs always identify which build produced them.
-const VERSION = '0.2.1'
+const VERSION = '0.2.2'
 
 // >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
 // must use no workflow globals (agent/parallel/args/...) - pure functions only.
@@ -60,27 +60,35 @@ function parseArgs(argstr) {
   let profile = null
   let specialization = null
   let outDir = null
+  let stamp = null
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]
-    if (t === '--profile' || t === '--for' || t === '--out') {
+    if (t === '--profile' || t === '--for' || t === '--out' || t === '--stamp') {
       const next = tokens[i + 1]
       const val = next && !next.startsWith('--') ? tokens[++i] : null
       if (t === '--profile') profile = val || profile
       else if (t === '--for') specialization = val || specialization
-      else outDir = val || outDir
+      else if (t === '--out') outDir = val || outDir
+      else stamp = val || stamp
     } else if (t.startsWith('--profile=')) {
       profile = t.slice('--profile='.length) || profile
     } else if (t.startsWith('--for=')) {
       specialization = t.slice('--for='.length) || specialization
     } else if (t.startsWith('--out=')) {
       outDir = t.slice('--out='.length) || outDir
+    } else if (t.startsWith('--stamp=')) {
+      stamp = t.slice('--stamp='.length) || stamp
     } else if (t.startsWith('--')) {
       // unknown flag - ignore
     } else {
       repos.push(splitRepoToken(t))
     }
   }
-  return { repos, profile, specialization, outDir }
+  // drop empty-path repos (e.g. a quoted "" token) for parity with the
+  // structured-object branch in normalizeArgs, which filters pathless items.
+  return {
+    repos: repos.filter(r => r.path), profile, specialization, outDir, stamp,
+  }
 }
 
 // normalize the command's arguments into { repos: [{path, flavor}], profile,
@@ -113,6 +121,7 @@ function normalizeArgs(args) {
   const specialization =
     typeof args.specialization === 'string' ? args.specialization : null
   const outDir = typeof args.outDir === 'string' ? args.outDir : null
+  const stamp = typeof args.stamp === 'string' ? args.stamp : null
   const list = Array.isArray(args.repos) ? args.repos : []
   const repos = list
     .map(r => {
@@ -122,7 +131,7 @@ function normalizeArgs(args) {
       return { path, flavor }
     })
     .filter(r => r.path)
-  return { repos, profile, specialization, outDir }
+  return { repos, profile, specialization, outDir, stamp }
 }
 
 // the world of allowed profiles. a profile sets WHO is judging and the verdict
@@ -200,6 +209,16 @@ const LENS_OWNED = new Set([
 ])
 const OWNER_WEIGHT = 2
 
+// the legal score range, every axis (kept in sync with SCORE_PROPS' schema
+// bounds, which reference these). reconcileScores clamps to it defensively.
+const SCORE_MIN = 1
+const SCORE_MAX = 10
+
+// clamp a finite score into [SCORE_MIN, SCORE_MAX].
+function clampScore(s) {
+  return s < SCORE_MIN ? SCORE_MIN : s > SCORE_MAX ? SCORE_MAX : s
+}
+
 // reconcile per-axis scores across reviews. on a lens-owned axis the owning
 // reviewer counts OWNER_WEIGHT, others 1 (weighted mean); honesty/overall have
 // no owner, so plain mean. also report the min-max range per axis. an axis
@@ -212,8 +231,12 @@ function reconcileScores(reviews) {
     let weighted = 0, wsum = 0, n = 0
     let min = Infinity, max = -Infinity
     for (const r of list) {
-      const s = r && r.scores ? r.scores[axis] : undefined
-      if (typeof s !== 'number' || Number.isNaN(s)) continue
+      const raw = r && r.scores ? r.scores[axis] : undefined
+      // defense in depth vs. the schema: drop non-finite scores (NaN, +/-Inf,
+      // non-numbers) outright, and clamp the rest into the legal range so an
+      // out-of-band value can't silently skew the weighted mean or the range.
+      if (!Number.isFinite(raw)) continue
+      const s = clampScore(raw)
       const w = LENS_OWNED.has(axis) && r.lens === axis ? OWNER_WEIGHT : 1
       weighted += s * w
       wsum += w
@@ -266,6 +289,31 @@ function repoSlug(path) {
   const base = trimmed.split(/[/\\]/).pop()
   if (!base || base === '.' || base === '..') return 'repo'
   return base.replace(/[^A-Za-z0-9_.-]/g, '-') || 'repo'
+}
+
+// per-repo output directory: <outBase>/<slug>, with an optional run stamp
+// nested beneath (<outBase>/<slug>/<stamp>) so re-runs don't clobber earlier
+// ones. the stamp comes from outside (the command), so sanitize it like a slug.
+function repoOutDir(outBase, slug, stamp) {
+  const dir = `${outBase}/${slug}`
+  return stamp ? `${dir}/${repoSlug(stamp)}` : dir
+}
+
+// distinct repos can share a slug (e.g. a/foo and b/foo) and would write to the
+// same output dir, clobbering each other. group the given repos by slug and
+// return only the colliding groups ({ slug, paths }), so the caller can warn.
+function findSlugCollisions(repos) {
+  const bySlug = new Map()
+  for (const r of Array.isArray(repos) ? repos : []) {
+    const slug = repoSlug(r && r.path)
+    if (!bySlug.has(slug)) bySlug.set(slug, [])
+    bySlug.get(slug).push(r && r.path)
+  }
+  const collisions = []
+  for (const [slug, paths] of bySlug) {
+    if (paths.length > 1) collisions.push({ slug, paths })
+  }
+  return collisions
 }
 // <<< pure
 
@@ -389,7 +437,9 @@ const HANDS_ON = {
 
 // ---- schemas (built per-run; recommendation/verdict use profile.verdicts) -
 const SCORE_PROPS = Object.fromEntries(
-  SCORE_AXES.map(a => [a, { type: 'number', minimum: 1, maximum: 10 }]),
+  SCORE_AXES.map(a => [
+    a, { type: 'number', minimum: SCORE_MIN, maximum: SCORE_MAX },
+  ]),
 )
 const DETECT_SCHEMA = {
   type: 'object',
@@ -464,10 +514,10 @@ function detectPrompt(repo) {
       'one-line rationale citing what you saw (file names, README lines).',
   ].join('\n\n')
 }
-function reviewPrompt(repo, lens, profile, flavor, outBase) {
+function reviewPrompt(repo, lens, profile, flavor, outBase, stamp) {
   const slug = repoSlug(repo.path)
   const tmp = `/tmp/rr-${slug}-${lens.key}`
-  const outPath = `${outBase}/${slug}/${lens.key}.md`
+  const outPath = `${repoOutDir(outBase, slug, stamp)}/${lens.key}.md`
   const verdicts = profile.verdicts.join(', ')
   // each lens gets a hands-on mandate scoped to its axis (deep test-authoring
   // for correctness, profiling for performance, light/read-oriented for
@@ -531,9 +581,9 @@ function reviewPrompt(repo, lens, profile, flavor, outBase) {
       'in the doc you wrote.',
   ].join('\n\n')
 }
-function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase) {
+function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp) {
   const slug = repoSlug(repo.path)
-  const memoPath = `${outBase}/${slug}/MEMO.md`
+  const memoPath = `${repoOutDir(outBase, slug, stamp)}/MEMO.md`
   const verdicts = profile.verdicts.join(', ')
   const compact = reviews.map(r => ({
     lens: r.lens,
@@ -602,7 +652,7 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase) {
 // Fully SEQUENTIAL by design: repos one at a time, and the five lens reviewers
 // one at a time within each. Only one clone/build/run is ever active, so
 // profiling/benchmarks are uncontended and RAM stays bounded.
-const { repos, profile: profileName, specialization, outDir } =
+const { repos, profile: profileName, specialization, outDir, stamp } =
   normalizeArgs(args)
 const profile = resolveProfile(profileName, specialization)
 if (!repos.length) return { error: 'no repositories given', profile: profile.name }
@@ -610,10 +660,19 @@ if (!repos.length) return { error: 'no repositories given', profile: profile.nam
 // docs land deterministically at the invocation dir regardless of where lens
 // agents cd to; falls back to the relative default for direct invocation.
 const outBase = outDir || OUTDIR
+// a run stamp (passed by the command, since the engine can't read the clock)
+// nests each run's docs under <outBase>/<slug>/<stamp>, so re-runs don't
+// clobber earlier ones. absent -> docs land directly under <outBase>/<slug>.
 const reviewSchema = buildReviewSchema(profile)
 const synthesisSchema = buildSynthesisSchema(profile)
 log(`repo-review v${VERSION}: ${repos.length} repo(s), profile ` +
-  `${profile.name}, output -> ${outBase}`)
+  `${profile.name}, output -> ${outBase}${stamp ? `/<slug>/${stamp}` : ''}`)
+// distinct repos sharing a slug write to the same dir and would clobber each
+// other (the stamp doesn't separate same-run repos) - warn so it's not silent.
+for (const c of findSlugCollisions(repos)) {
+  log(`WARNING: output-slug collision on "${c.slug}" - these repos overwrite ` +
+    `each other's docs: ${c.paths.join(', ')}`)
+}
 log(
   `heads-up - thorough, token-heavy run: every lens clones, builds, and ` +
   `runs the code over a long session (the deeper lenses also write their ` +
@@ -648,10 +707,13 @@ for (const repo of repos) {
   const reviews = []
   for (const lens of LENSES) {
     log(`${tag}: review start - ${lens.title}`)
-    const r = await agent(reviewPrompt(repo, lens, profile, flavor, outBase), {
-      label: `review:${repo.path}:${lens.key}`,
-      phase: 'Reviews', schema: reviewSchema,
-    })
+    const r = await agent(
+      reviewPrompt(repo, lens, profile, flavor, outBase, stamp),
+      {
+        label: `review:${repo.path}:${lens.key}`,
+        phase: 'Reviews', schema: reviewSchema,
+      },
+    )
     if (r) {
       reviews.push({ ...r, lens: lens.key })
       const ov = r.scores ? r.scores.overall : '?'
@@ -670,7 +732,7 @@ for (const repo of repos) {
   // recompute the scores (those come from reconcileScores above)
   log(`${tag}: synthesis - writing memo`)
   const synthesis = await agent(
-    synthesisPrompt(repo, profile, flavor, reviews, scores, outBase),
+    synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp),
     {
       label: `synthesis:${repo.path}`,
       phase: 'Synthesis',
