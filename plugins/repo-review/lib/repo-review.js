@@ -83,10 +83,29 @@ function parseArgs(argstr) {
   return { repos, profile, specialization, outDir }
 }
 
-// normalize whatever the command passes - a raw string or a structured object
-// - into { repos: [{path, flavor}], profile }. strings go through parseArgs;
-// objects are validated/coerced and unknown flavors dropped to null.
+// normalize the command's arguments into { repos: [{path, flavor}], profile,
+// specialization, outDir }. The command (doorman) passes a single raw arg
+// string, which parseArgs handles. A structured object is also accepted
+// DEFENSIVELY - it isn't a documented input shape, but a programmatic caller
+// could hand one over, so we coerce it rather than mis-parse it.
 function normalizeArgs(args) {
+  // A structured object may arrive serialized to JSON (some invocation paths
+  // stringify it in transit), landing here as a string. Recover it before
+  // falling back to raw-arg parsing: a JSON object run through parseArgs would
+  // be tokenized, and since none of its fragments match --profile/--for/--out,
+  // every fragment (and every word of the --for text) degrades into a bogus
+  // repo, fanning out junk reviews.
+  if (typeof args === 'string' && args.trim().startsWith('{')) {
+    let parsed = null
+    try {
+      parsed = JSON.parse(args.trim())
+    } catch {
+      // not valid JSON - leave it for raw-arg-string parsing below
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return normalizeArgs(parsed)
+    }
+  }
   if (typeof args === 'string' || args == null) {
     return parseArgs(args == null ? '' : args)
   }

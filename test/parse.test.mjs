@@ -186,3 +186,32 @@ test('normalizeArgs: bad repos shape -> empty; pathless items dropped', () => {
   assert.deepEqual(normalizeArgs({ repos: 'nope' }), empty)
   assert.deepEqual(normalizeArgs({ repos: [{ flavor: 'personal' }] }), empty)
 })
+
+test('normalizeArgs: JSON-stringified object is recovered, not tokenized', () => {
+  // a structured object can arrive serialized to a string in transit; it must
+  // round-trip to the same result as the object form, NOT get tokenized into
+  // bogus repos (one per JSON fragment / --for word).
+  const obj = {
+    repos: [{ path: '.', flavor: 'production' }],
+    profile: 'oss-audit',
+    specialization: 'judge it as a distributable plugin, not a dependency',
+    outDir: '/abs/out',
+  }
+  assert.deepEqual(normalizeArgs(JSON.stringify(obj)), normalizeArgs(obj))
+  // and concretely: exactly one repo, not a fragment-per-word fan-out.
+  assert.deepEqual(normalizeArgs(JSON.stringify(obj)).repos, [
+    { path: '.', flavor: 'production' },
+  ])
+})
+
+test('normalizeArgs: malformed JSON-ish string falls through to parseArgs', () => {
+  // leading "{" but not valid JSON -> no throw, parsed as a raw arg string.
+  const s = '{ not json --profile job'
+  assert.deepEqual(normalizeArgs(s), parseArgs(s))
+})
+
+test('normalizeArgs: JSON array string is not treated as an object', () => {
+  // only a JSON *object* is recovered; an array string is left to parseArgs.
+  const s = '["./a", "./b"]'
+  assert.deepEqual(normalizeArgs(s), parseArgs(s))
+})

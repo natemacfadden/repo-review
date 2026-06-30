@@ -86,7 +86,7 @@ the memo. Score reconciliation between reviewers is plain code, not a model.
 
 **Why have the command at all, instead of just the workflow?** The workflow
 runs in a restricted, deterministic sandbox and is invoked programmatically by
-path with a fixed `args` object - it can't read the environment (e.g. the
+path with a fixed `args` string - it can't read the environment (e.g. the
 current directory, which we need so output lands deterministically) or present
 a CLI. The command is the thin, agent-driven adapter that gathers that context
 plus the user's input and translates it into a proper workflow call. So it

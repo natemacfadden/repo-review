@@ -102,23 +102,10 @@ Workflow({
 })
 ```
 
-The workflow also accepts a structured object, so an agent invoking it
-programmatically can skip the string entirely (pass `outDir` directly):
-
-```
-Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/lib/repo-review.js",
-  args: {
-    repos: [{ path: "./a", flavor: "performance" }, { path: "./b" }],
-    profile: "job",
-    specialization: "a RE role at Anthropic",
-    outDir: "<pwd>/repo-review-out"
-  }
-})
-```
-
-Both forms normalize to `{ repos, profile, specialization, outDir }`. If `outDir`
-is omitted the output base falls back to a relative `repo-review-out`.
+Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
+with `--out` appended. The engine does the parsing (see Usage above); do not
+restructure the arguments into an object yourself. If `--out` is omitted the
+output base falls back to a relative `repo-review-out`.
 
 **Fallback** (no Workflow tool). The Workflow engine is only deterministic
 orchestration - the reviewing is agent work, so reproduce the structure with
