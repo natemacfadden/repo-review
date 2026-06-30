@@ -18,7 +18,7 @@ export const meta = {
 // plugin version - bump on every behavior change and keep in sync with
 // .claude-plugin/plugin.json (check.sh enforces the match). printed at the
 // start of every run so logs always identify which build produced them.
-const VERSION = '0.2.0'
+const VERSION = '0.2.1'
 
 // >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
 // must use no workflow globals (agent/parallel/args/...) - pure functions only.
