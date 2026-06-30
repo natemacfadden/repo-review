@@ -15,6 +15,11 @@ export const meta = {
   ],
 }
 
+// plugin version - bump on every behavior change and keep in sync with
+// .claude-plugin/plugin.json (check.sh enforces the match). printed at the
+// start of every run so logs always identify which build produced them.
+const VERSION = '0.2.0'
+
 // >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
 // must use no workflow globals (agent/parallel/args/...) - pure functions only.
 const KNOWN_FLAVORS = ['performance', 'research', 'production', 'personal']
@@ -588,13 +593,13 @@ if (!repos.length) return { error: 'no repositories given', profile: profile.nam
 const outBase = outDir || OUTDIR
 const reviewSchema = buildReviewSchema(profile)
 const synthesisSchema = buildSynthesisSchema(profile)
-log(`repo-review: ${repos.length} repo(s), profile ${profile.name}, ` +
-  `output -> ${outBase}`)
+log(`repo-review v${VERSION}: ${repos.length} repo(s), profile ` +
+  `${profile.name}, output -> ${outBase}`)
 log(
   `heads-up - thorough, token-heavy run: every lens clones, builds, and ` +
   `runs the code over a long session (the deeper lenses also write their ` +
   `own tests). expect very roughly ~10-20M tokens (mostly cache reads), ` +
-  `~80-130k output, ~0.5-1.5h per repo. on metered API that is ~$30-50/repo ` +
+  `~80-130k output, ~0.5-2h per repo. on metered API that is ~$30-50/repo ` +
   `(Opus), but a Claude subscription subsidizes this heavily - it runs ` +
   `easily on a $100/mo plan. interrupt now if unintended.`
 )

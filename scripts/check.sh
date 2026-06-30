@@ -68,7 +68,18 @@ else
   skip "meta (node not found - activate the conda env)"
 fi
 
-# 6. plugin + marketplace manifest structure
+# 6. version sync: engine VERSION const must match plugin.json, so the printed
+# version reliably identifies which build ran
+section "version sync"
+ev=$(grep -oE "VERSION = '[^']+'" plugins/repo-review/lib/repo-review.js | head -1 | grep -oE "[0-9][^']*")
+pv=$(python3 -c "import json; print(json.load(open('plugins/repo-review/.claude-plugin/plugin.json'))['version'])" 2>/dev/null)
+if [ -n "$ev" ] && [ "$ev" = "$pv" ]; then
+  ok "version sync ($ev)"
+else
+  bad "version sync (engine '$ev' != plugin.json '$pv')"
+fi
+
+# 7. plugin + marketplace manifest structure
 section "plugin validate"
 if command -v claude >/dev/null 2>&1; then
   if claude plugin validate . --strict < /dev/null; then
@@ -80,7 +91,7 @@ else
   skip "plugin validate (claude CLI not found)"
 fi
 
-# 7. unit tests (node's built-in runner; skipped until tests exist)
+# 8. unit tests (node's built-in runner; skipped until tests exist)
 section "tests"
 if ! command -v node >/dev/null 2>&1; then
   skip "tests (node not found - activate the conda env)"

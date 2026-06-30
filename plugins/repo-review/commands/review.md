@@ -49,7 +49,7 @@ This is **thorough and token-heavy by design**: every lens clones, builds, and
 *runs* the code over a long independent session (the deeper lenses also write
 and run their own tests). Budget very roughly **~10-20M tokens per repo**
 (overwhelmingly cache reads from those long sessions), ~80-130k output tokens,
-and **~30-90 minutes per repo**.
+and **~30 minutes to ~2 hours per repo**.
 
 On **metered API pricing** that is ~30-50 USD per repo (Opus; scales with repo
 size, complexity, and lens depth). On a **Claude subscription this is heavily
@@ -74,7 +74,8 @@ defaults:
 - each repo's flavor (auto-detected unless pinned as `path:flavor`)
 
 Ask whether the user wants to set any of these or proceed with the defaults.
-Also state the estimated cost - roughly 30-90 minutes and 30-50 USD per repo on
+Also state the estimated cost - roughly 30 minutes to 2 hours and 30-50 USD per
+repo on
 metered API pricing (heavily subsidized on a Claude subscription; within a
 100 USD/mo Max plan), scaled by the repo count. Only launch once the user
 explicitly confirms; if they decline, stop without running. You may inspect the
