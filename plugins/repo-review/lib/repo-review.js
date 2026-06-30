@@ -591,12 +591,12 @@ const synthesisSchema = buildSynthesisSchema(profile)
 log(`repo-review: ${repos.length} repo(s), profile ${profile.name}, ` +
   `output -> ${outBase}`)
 log(
-  `heads-up - thorough, token-heavy run: every lens clones, builds, runs ` +
-  `the code and writes its own tests over a long session. expect very ` +
-  `roughly ~15-20M tokens (mostly cache reads), ~100k output, ~1-2h per ` +
-  `repo. on metered API that is ~$40-60/repo (Opus), but a Claude ` +
-  `subscription subsidizes this heavily - it runs easily on a $100/mo plan. ` +
-  `interrupt now if unintended.`
+  `heads-up - thorough, token-heavy run: every lens clones, builds, and ` +
+  `runs the code over a long session (the deeper lenses also write their ` +
+  `own tests). expect very roughly ~10-20M tokens (mostly cache reads), ` +
+  `~80-130k output, ~0.5-1.5h per repo. on metered API that is ~$30-50/repo ` +
+  `(Opus), but a Claude subscription subsidizes this heavily - it runs ` +
+  `easily on a $100/mo plan. interrupt now if unintended.`
 )
 
 const results = []
