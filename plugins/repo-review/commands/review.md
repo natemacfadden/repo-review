@@ -3,6 +3,12 @@ description: Clone, build, run, and review a repo across five lenses
 argument-hint: <repo-path[:flavor]>... [--profile <name>] [--for <text>] [--out <dir>]
 ---
 
+**First, always print the plugin version.** Before doing anything else -
+showing usage or launching - read `version` from
+`${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` and print
+`repo-review v<version>` as the first line of your response, so the running
+build is always identifiable for debugging.
+
 Review one or more code repositories by actually standing each up: clone,
 build, run a demo, then judge across five lenses (performance, correctness,
 engineering, taste & positioning, documentation) and synthesize a scored
