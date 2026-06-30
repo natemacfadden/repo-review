@@ -125,10 +125,13 @@ of the tooling below ships as a runtime dependency.
 Prerequisites: conda and the Claude Code CLI.
 
 ```
-conda env create -f environment.yml   # runtime layer: node
+conda env create -f environment.yml   # runtime layer: node (only prerequisite)
 conda activate repo-review
-npm install                           # package layer: dev tools -> node_modules
 ```
+
+No `npm install` is needed: `package.json` declares no dependencies - it only
+provides the `npm run check` / `npm test` aliases below. The checkers in
+`scripts/` and node's built-in test runner are self-contained.
 
 Run all checks (the same entry point CI runs):
 
@@ -146,3 +149,7 @@ Run just the unit tests during development:
 ```
 npm test
 ```
+
+## License
+
+[MIT](LICENSE) (c) 2026 Nate MacFadden.

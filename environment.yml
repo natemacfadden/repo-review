@@ -2,12 +2,13 @@
 # install: conda env create -f environment.yml
 #
 # layer 1 (runtime): this file provisions node via conda-forge
-# layer 2 (packages): JS dev tools (editorconfig-checker, a test runner) live
-#   in package.json and install into node_modules via `npm install`
+# layer 2 (tooling): the dev/CI tools are self-contained - node's built-in test
+#   runner plus the checkers in scripts/. package.json declares NO dependencies;
+#   it only provides `npm run check` / `npm test` aliases (no node_modules).
 name: repo-review
 channels:
   - conda-forge
 dependencies:
   - nodejs>=20
   # future conda-provided tooling goes here (e.g. python for offline manifest
-  # schema validation); JS dev tools belong in package.json instead
+  # schema validation); JS dev tooling stays self-contained in scripts/ (no deps)
