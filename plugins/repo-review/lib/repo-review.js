@@ -324,6 +324,45 @@ const LENSES = [
   },
 ]
 
+// per-lens hands-on mandate: the deep, expensive probing each lens should do,
+// scoped to its axis. directs effort (and cost) where the lens pays off, and
+// stops every lens re-deriving the same correctness/perf findings. spliced
+// into the shared hands-on block by reviewPrompt.
+const HANDS_ON = {
+  correctness:
+    '- TESTING IS YOUR MAIN HANDS-ON WORK: write your own tests - ' +
+    'property/invariant checks, reference or oracle cross-checks, edge ' +
+    'cases, and harder-than-shipped inputs - and run them to independently ' +
+    'confirm or break the headline outputs. Go well beyond the shipped ' +
+    'suite; report what you wrote and what it showed.',
+  performance:
+    '- PROFILE the code yourself (cProfile/pprofile for Python, or a ' +
+    'profiler appropriate to the stack) to find where time actually goes, ' +
+    'reproduce the headline performance numbers, and scrutinize the ' +
+    'benchmark methodology (warmup, repeats, error bars, fixed/reported ' +
+    'hardware, fair baselines). Write small perf probes where they sharpen ' +
+    'the picture; do not author a broad correctness suite.',
+  engineering:
+    '- BUILD AND INSTALL FROM SCRATCH (record friction), run the shipped ' +
+    'tests and any CI locally, and check reproducibility - seeds, configs, ' +
+    'and whether headline results regenerate from the repo as shipped. A ' +
+    'few targeted checks suffice; you need not author an extensive new test ' +
+    'suite or profile in depth - leave those to the correctness and ' +
+    'performance lenses.',
+  documentation:
+    '- FOLLOW THE README AS A COLD DROP-IN: install and run the FIRST ' +
+    'documented example exactly as written, noting how fast you reach a ' +
+    'working result and where you snag - that standup experience is your ' +
+    'evidence. Do NOT write oracle suites, profile, or stress-test; that ' +
+    'is not your lens. Judge time-to-first-success and friction.',
+  taste:
+    '- MOSTLY READ: assess whether the problem is worth solving, prior art ' +
+    'and honest positioning vs. real alternatives, scope, and whether the ' +
+    'approach fits. Run a quick example to ground your read, but do NOT ' +
+    'author test suites or profile - spend your effort on the positioning ' +
+    'call, not on re-verifying correctness or performance.',
+}
+
 // ---- schemas (built per-run; recommendation/verdict use profile.verdicts) -
 const SCORE_PROPS = Object.fromEntries(
   SCORE_AXES.map(a => [a, { type: 'number', minimum: 1, maximum: 10 }]),
@@ -406,17 +445,10 @@ function reviewPrompt(repo, lens, profile, flavor, outBase) {
   const tmp = `/tmp/rr-${slug}-${lens.key}`
   const outPath = `${outBase}/${slug}/${lens.key}.md`
   const verdicts = profile.verdicts.join(', ')
-  // profiling is core to the performance lens (and engineering, for repro);
-  // for the other lenses it is optional - encouraged where it sharpens their
-  // angle, but they should not feel obligated to profile.
-  const mustProfile = lens.key === 'performance' || lens.key === 'engineering'
-  const profileLine = mustProfile
-    ? '- PROFILE the code yourself (cProfile/pprofile for Python, or a ' +
-      'profiler appropriate to the stack) to find where time actually ' +
-      'goes - expected for your lens; do not take perf claims on faith.'
-    : '- You are free to profile if it would sharpen your lens, but it is ' +
-      'not required - do not profile out of obligation; spend effort where ' +
-      'your lens pays off.'
+  // each lens gets a hands-on mandate scoped to its axis (deep test-authoring
+  // for correctness, profiling for performance, light/read-oriented for
+  // documentation and taste) so the lenses do not all re-run the same checks.
+  const handsOn = HANDS_ON[lens.key] || ''
   return [
     `You are ${profile.audience}. You are reviewing the repository at ` +
       `\`${repo.path}\`, and your job is to ${profile.purpose}. Judge it ` +
@@ -439,15 +471,12 @@ function reviewPrompt(repo, lens, profile, flavor, outBase) {
       '(e.g. a venv inside the temp dir). Record every step, error, and ' +
       'workaround - setup friction is a real finding.\n' +
       '3. Actually RUN a demo/example and observe real output.',
-    'BE HANDS-ON - THIS IS THE POINT. You have a private clone; use it:\n' +
-      '- Run ANY code you want. Reproduce the headline claims and stress ' +
-      'them.\n' +
-      '- WRITE YOUR OWN TESTS. Author new test cases / scripts in your ' +
-      'clone and run them to independently verify behavior, correctness, ' +
-      'and (where relevant) performance - go BEYOND the tests the repo ' +
-      'ships. This is required, not optional. Report what you wrote and ' +
-      'what it showed.\n' +
-      profileLine + '\n' +
+    'BE HANDS-ON - you have a private clone; use it. Run the code to ground ' +
+      'your review. Spend your hands-on effort where YOUR lens pays off ' +
+      '(below) - do not re-run every other lens\'s deep checks; the lenses ' +
+      'are independent on purpose, so a light pass outside your lens is ' +
+      'fine, but do not duplicate their work.\n' +
+      handsOn + '\n' +
       '- Note additional validation/tests the authors should add.',
     'MACHINE IS RAM-LIMITED: before any heavy build/run, check available ' +
       'memory (e.g. free -m). If memory is tight or an op risks an OOM ' +
