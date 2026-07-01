@@ -15,3 +15,9 @@ max_line_length = 88
 # json/yaml description values are single, unwrappable strings - no length cap
 [*.{json,yml,yaml}]
 max_line_length = off
+
+# LICENSE is verbatim GPLv3 text - do not reformat or lint its style
+[LICENSE]
+indent_style = unset
+indent_size = unset
+max_line_length = off
