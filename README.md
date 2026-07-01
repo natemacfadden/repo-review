@@ -9,6 +9,27 @@ synthesizes a scored review. Two overlays tune the review: a **profile** (who is
 judging and how to grade; default a general code-quality review) and a
 **flavor** (what the repo is for, e.g. high-performance vs. personal).
 
+## How the review is shaped
+
+- **Lenses** - every run judges the same five: performance, correctness,
+  engineering, taste & positioning, documentation. Each is a separate reviewer
+  working in its own clone, so the takes stay independent.
+- **`--profile`** - *who* is judging and the verdict scale. `general`
+  (default) grades it as software (Excellent-Poor); `--profile job` grades it
+  as a hiring committee (Strong Hire-No-Hire); `--profile oss-audit` asks
+  "should we depend on this?" (Adopt / Use with care / Avoid);
+  `--profile student-project` grades it A-F.
+- **`:flavor`** (per repo) - *what the repo is for*, which tunes what each lens
+  expects. `./api:performance` demands real benchmarks; `./toy:personal`
+  won't penalize missing CI. Omit it and the flavor is auto-detected.
+- **`--for "<text>"`** - free-text specialization on top of the profile.
+  `--profile job --for "a senior frontend role at a design-led startup"`
+  shifts the same hiring lens toward design and UI polish.
+
+So `./ui:performance --profile job --for "a Research Engineer role"` reviews
+`./ui` as a high-performance codebase, judged by a hiring committee, for an RE
+role - same five lenses, three different dials on top.
+
 ## Install
 
 Run these as slash commands inside a Claude Code session (not a shell):
