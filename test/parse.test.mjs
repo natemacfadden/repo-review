@@ -69,6 +69,7 @@ test('splitRepoToken: windows drive letter survives', () => {
 
 const EMPTY = {
   repos: [], profile: null, specialization: null, outDir: null, stamp: null,
+  date: null,
 }
 
 test('parseArgs: empty -> no repos, profile, specialization, outDir', () => {
@@ -88,6 +89,7 @@ test('parseArgs: multiple repos with per-repo flavors', () => {
     specialization: null,
     outDir: null,
     stamp: null,
+    date: null,
   })
 })
 
@@ -98,6 +100,7 @@ test('parseArgs: --profile with a value, anywhere', () => {
     specialization: null,
     outDir: null,
     stamp: null,
+    date: null,
   })
 })
 
@@ -108,6 +111,7 @@ test('parseArgs: --profile=value form', () => {
     specialization: null,
     outDir: null,
     stamp: null,
+    date: null,
   })
 })
 
@@ -118,6 +122,7 @@ test('parseArgs: --profile with no value is ignored', () => {
     specialization: null,
     outDir: null,
     stamp: null,
+    date: null,
   })
 })
 
@@ -128,6 +133,7 @@ test('parseArgs: unknown flags are ignored, not treated as repos', () => {
     specialization: null,
     outDir: null,
     stamp: null,
+    date: null,
   })
 })
 
@@ -139,6 +145,7 @@ test('parseArgs: --for captures a quoted multi-word value', () => {
     specialization: 'a RE role at Anthropic',
     outDir: null,
     stamp: null,
+    date: null,
   })
 })
 
@@ -191,7 +198,7 @@ test('normalizeArgs: null/undefined -> empty', () => {
   assert.deepEqual(normalizeArgs(undefined), EMPTY)
 })
 
-test('normalizeArgs: structured object passes through (incl outDir, stamp)', () => {
+test('normalizeArgs: structured object passes through (outDir, stamp, date)', () => {
   assert.deepEqual(
     normalizeArgs({
       repos: [{ path: './a', flavor: 'personal' }],
@@ -199,6 +206,7 @@ test('normalizeArgs: structured object passes through (incl outDir, stamp)', () 
       specialization: 'team X',
       outDir: '/abs/out',
       stamp: 'run9',
+      date: '2025-01-15',
     }),
     {
       repos: [{ path: './a', flavor: 'personal' }],
@@ -206,6 +214,7 @@ test('normalizeArgs: structured object passes through (incl outDir, stamp)', () 
       specialization: 'team X',
       outDir: '/abs/out',
       stamp: 'run9',
+      date: '2025-01-15',
     },
   )
 })
@@ -225,6 +234,7 @@ test('normalizeArgs: string repo items are split', () => {
     specialization: null,
     outDir: null,
     stamp: null,
+    date: null,
   })
 })
 
@@ -235,6 +245,7 @@ test('normalizeArgs: unknown flavor coerced to null', () => {
     specialization: null,
     outDir: null,
     stamp: null,
+    date: null,
   })
 })
 

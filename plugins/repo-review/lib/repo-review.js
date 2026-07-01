@@ -64,7 +64,8 @@ function parseArgs(argstr) {
   let date = null
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]
-    if (t === '--profile' || t === '--for' || t === '--out' || t === '--stamp' || t === '--date') {
+    if (t === '--profile' || t === '--for' || t === '--out' ||
+        t === '--stamp' || t === '--date') {
       const next = tokens[i + 1]
       const val = next && !next.startsWith('--') ? tokens[++i] : null
       if (t === '--profile') profile = val || profile
