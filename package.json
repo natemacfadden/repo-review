@@ -2,7 +2,7 @@
   "name": "repo-review-dev",
   "version": "0.1.0",
   "private": true,
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "Dev/CI tooling for the repo-review Claude Code plugin",
   "scripts": {
     "check": "bash scripts/check.sh",

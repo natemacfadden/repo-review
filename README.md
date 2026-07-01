@@ -1,6 +1,5 @@
 # repo-review
-*[Nate MacFadden](https://github.com/natemacfadden)*
-*Developed with [Claude Code](https://claude.com/claude-code).*
+*[Nate MacFadden](https://github.com/natemacfadden). Developed with [Claude Code](https://claude.com/claude-code).*
 
 A Claude Code plugin that reviews one or more code repositories by **actually
 running them** - clone, build, run a demo - then judges each across five lenses
@@ -173,4 +172,4 @@ npm test
 
 ## License
 
-[MIT](LICENSE) (c) 2026 Nate MacFadden.
+[GPLv3](LICENSE). Copyright (c) 2026 Nate MacFadden.
