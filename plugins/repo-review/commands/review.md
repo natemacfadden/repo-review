@@ -41,6 +41,10 @@ review.
   repo's dir so re-runs don't clobber earlier ones:
   `<out>/<repo>/<stamp>/...`. Normally supplied automatically by this command;
   omit it and docs land directly in `<out>/<repo>/`.
+- **`--date <YYYY-MM-DD>`** - today's date, injected into the reviewer prompts
+  (the engine can't read the clock) so agents don't flag recent dates, versions,
+  or citations as "future" or fabricated. Normally supplied automatically by
+  this command; omit it and reviewers get no current-date note.
 
 Examples:
 
@@ -94,26 +98,29 @@ workflow does the real parsing.
 
 **Preferred - Workflow orchestration.** If the Workflow tool is available (this
 command invocation is your authorization), use it. First run
-`pwd` and `date -u +%Y%m%dT%H%M%SZ` to capture the absolute invocation
-directory and a run timestamp, then append both `--out "<pwd>/repo-review-out"`
-(so review docs land deterministically there - not inside a lens agent's temp
-clone, which gets deleted) and `--stamp <timestamp>` (so a re-run nests under a
-fresh dir instead of clobbering the previous run). Replace `<pwd>` and
-`<timestamp>` with the actual values and keep the quotes in case the path has
-spaces:
+`pwd`, `date -u +%Y%m%dT%H%M%SZ`, and `date +%Y-%m-%d` to capture the absolute
+invocation directory, a run timestamp, and today's date, then append
+`--out "<pwd>/repo-review-out"` (so review docs land deterministically there -
+not inside a lens agent's temp clone, which gets deleted), `--stamp <timestamp>`
+(so a re-run nests under a fresh dir instead of clobbering the previous run),
+and `--date <date>` (the engine can't read the clock, so this passes today's
+date to the reviewer agents - it stops them flagging recent dates, versions, or
+citations as "future" or fabricated). Replace `<pwd>`, `<timestamp>`, and
+`<date>` with the actual values and keep the quotes in case the path has spaces:
 
 ```
 Workflow({
   scriptPath: "${CLAUDE_PLUGIN_ROOT}/lib/repo-review.js",
-  args: "$ARGUMENTS --out \"<pwd>/repo-review-out\" --stamp <timestamp>"
+  args: "$ARGUMENTS --out \"<pwd>/repo-review-out\" --stamp <timestamp> --date <date>"
 })
 ```
 
 Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
-with `--out` and `--stamp` appended. The engine does the parsing (see Usage
-above); do not restructure the arguments into an object yourself. If `--out` is
-omitted the output base falls back to a relative `repo-review-out`; if `--stamp`
-is omitted docs land directly in `<out>/<repo>/`.
+with `--out`, `--stamp`, and `--date` appended. The engine does the parsing (see
+Usage above); do not restructure the arguments into an object yourself. If
+`--out` is omitted the output base falls back to a relative `repo-review-out`;
+if `--stamp` is omitted docs land directly in `<out>/<repo>/`; if `--date` is
+omitted the reviewers simply get no current-date note.
 
 **Fallback** (no Workflow tool). The Workflow engine is only deterministic
 orchestration - the reviewing is agent work, so reproduce the structure with
@@ -124,7 +131,9 @@ workflow would. For each repo, ONE AT A TIME (keep profiling uncontended and
 RAM bounded), spawn the five lens reviewers as separate subagents - each with
 its lens brief: clone/build/run a fresh copy, WRITE AND RUN ITS OWN TESTS,
 profile hot paths, score the seven axes 1-10, recommend on the profile's
-verdict scale, and write its per-lens doc. Then reconcile the scores yourself
+verdict scale, and write its per-lens doc. Include today's date (from
+`date +%Y-%m-%d`) in each brief so reviewers don't flag recent dates, versions,
+or citations as "future" or fabricated. Then reconcile the scores yourself
 - lens-weighted: the owning lens counts double on its own axis; honesty and
 overall are a plain mean - and write the memo (verdict, outliers,
 disagreements, consensus, oversell/undersell call, fixes) to

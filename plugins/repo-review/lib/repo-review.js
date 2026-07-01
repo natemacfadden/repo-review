@@ -18,7 +18,7 @@ export const meta = {
 // plugin version - bump on every behavior change and keep in sync with
 // .claude-plugin/plugin.json (check.sh enforces the match). printed at the
 // start of every run so logs always identify which build produced them.
-const VERSION = '0.2.2'
+const VERSION = '0.2.3'
 
 // >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
 // must use no workflow globals (agent/parallel/args/...) - pure functions only.
@@ -61,15 +61,17 @@ function parseArgs(argstr) {
   let specialization = null
   let outDir = null
   let stamp = null
+  let date = null
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]
-    if (t === '--profile' || t === '--for' || t === '--out' || t === '--stamp') {
+    if (t === '--profile' || t === '--for' || t === '--out' || t === '--stamp' || t === '--date') {
       const next = tokens[i + 1]
       const val = next && !next.startsWith('--') ? tokens[++i] : null
       if (t === '--profile') profile = val || profile
       else if (t === '--for') specialization = val || specialization
       else if (t === '--out') outDir = val || outDir
-      else stamp = val || stamp
+      else if (t === '--stamp') stamp = val || stamp
+      else date = val || date
     } else if (t.startsWith('--profile=')) {
       profile = t.slice('--profile='.length) || profile
     } else if (t.startsWith('--for=')) {
@@ -78,6 +80,8 @@ function parseArgs(argstr) {
       outDir = t.slice('--out='.length) || outDir
     } else if (t.startsWith('--stamp=')) {
       stamp = t.slice('--stamp='.length) || stamp
+    } else if (t.startsWith('--date=')) {
+      date = t.slice('--date='.length) || date
     } else if (t.startsWith('--')) {
       // unknown flag - ignore
     } else {
@@ -88,6 +92,7 @@ function parseArgs(argstr) {
   // structured-object branch in normalizeArgs, which filters pathless items.
   return {
     repos: repos.filter(r => r.path), profile, specialization, outDir, stamp,
+    date,
   }
 }
 
@@ -122,6 +127,7 @@ function normalizeArgs(args) {
     typeof args.specialization === 'string' ? args.specialization : null
   const outDir = typeof args.outDir === 'string' ? args.outDir : null
   const stamp = typeof args.stamp === 'string' ? args.stamp : null
+  const date = typeof args.date === 'string' ? args.date : null
   const list = Array.isArray(args.repos) ? args.repos : []
   const repos = list
     .map(r => {
@@ -131,7 +137,7 @@ function normalizeArgs(args) {
       return { path, flavor }
     })
     .filter(r => r.path)
-  return { repos, profile, specialization, outDir, stamp }
+  return { repos, profile, specialization, outDir, stamp, date }
 }
 
 // the world of allowed profiles. a profile sets WHO is judging and the verdict
@@ -514,7 +520,7 @@ function detectPrompt(repo) {
       'one-line rationale citing what you saw (file names, README lines).',
   ].join('\n\n')
 }
-function reviewPrompt(repo, lens, profile, flavor, outBase, stamp) {
+function reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date) {
   const slug = repoSlug(repo.path)
   const tmp = `/tmp/rr-${slug}-${lens.key}`
   const outPath = `${repoOutDir(outBase, slug, stamp)}/${lens.key}.md`
@@ -527,6 +533,10 @@ function reviewPrompt(repo, lens, profile, flavor, outBase, stamp) {
     `You are ${profile.audience}. You are reviewing the repository at ` +
       `\`${repo.path}\`, and your job is to ${profile.purpose}. Judge it ` +
       `against ${profile.bar}.`,
+    date && `Today's date is ${date}. Treat recent dates, versions, and ` +
+      'citations as plausibly real - do NOT flag something as a future, ' +
+      'erroneous, or fabricated date just because it postdates your ' +
+      'knowledge/training cutoff; verify against the repo instead.',
     `Repo intent (flavor): ${describeFlavor(flavor)}`,
     `YOUR LENS - weight this heavily, on top of a full review: ` +
       `${lens.title}.\n${lens.focus}`,
@@ -579,9 +589,9 @@ function reviewPrompt(repo, lens, profile, flavor, outBase, stamp) {
       'ONE-LINE summary; populate scores, recommendation, and the other ' +
       'fields. Do NOT return the full review text in the output - it lives ' +
       'in the doc you wrote.',
-  ].join('\n\n')
+  ].filter(Boolean).join('\n\n')
 }
-function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp) {
+function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp, date) {
   const slug = repoSlug(repo.path)
   const memoPath = `${repoOutDir(outBase, slug, stamp)}/MEMO.md`
   const verdicts = profile.verdicts.join(', ')
@@ -601,6 +611,9 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp)
       `as ${profile.label}. Your job is to ${profile.purpose}, judged ` +
       `against ${profile.bar}. Repo intent (flavor): ` +
       `${describeFlavor(flavor)}.`,
+    date && `Today's date is ${date}. Treat recent dates, versions, and ` +
+      'citations as plausibly real - do NOT flag anything as a future or ' +
+      'fabricated date just because it postdates your knowledge cutoff.',
     'Synthesize from the reviews BELOW ONLY. Do NOT clone, open, build, or ' +
       'inspect the repository or any local files - your working directory ' +
       'may contain an unrelated project. Base every statement on the ' +
@@ -645,14 +658,14 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp)
       'provenance, outliers, disagreements, consensus lists, and fixes. Do ' +
       'NOT return the full memo text in the output - it lives in the doc you ' +
       'wrote.',
-  ].join('\n\n')
+  ].filter(Boolean).join('\n\n')
 }
 
 // ---- orchestration -------------------------------------------------------
 // Fully SEQUENTIAL by design: repos one at a time, and the five lens reviewers
 // one at a time within each. Only one clone/build/run is ever active, so
 // profiling/benchmarks are uncontended and RAM stays bounded.
-const { repos, profile: profileName, specialization, outDir, stamp } =
+const { repos, profile: profileName, specialization, outDir, stamp, date } =
   normalizeArgs(args)
 const profile = resolveProfile(profileName, specialization)
 if (!repos.length) return { error: 'no repositories given', profile: profile.name }
@@ -708,7 +721,7 @@ for (const repo of repos) {
   for (const lens of LENSES) {
     log(`${tag}: review start - ${lens.title}`)
     const r = await agent(
-      reviewPrompt(repo, lens, profile, flavor, outBase, stamp),
+      reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date),
       {
         label: `review:${repo.path}:${lens.key}`,
         phase: 'Reviews', schema: reviewSchema,
@@ -732,7 +745,7 @@ for (const repo of repos) {
   // recompute the scores (those come from reconcileScores above)
   log(`${tag}: synthesis - writing memo`)
   const synthesis = await agent(
-    synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp),
+    synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp, date),
     {
       label: `synthesis:${repo.path}`,
       phase: 'Synthesis',
