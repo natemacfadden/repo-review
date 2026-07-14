@@ -18,7 +18,7 @@ export const meta = {
 // plugin version - bump on every behavior change and keep in sync with
 // .claude-plugin/plugin.json (check.sh enforces the match). printed at the
 // start of every run so logs always identify which build produced them.
-const VERSION = '0.2.3'
+const VERSION = '0.2.4'
 
 // >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
 // must use no workflow globals (agent/parallel/args/...) - pure functions only.
@@ -53,9 +53,12 @@ function tokenize(str) {
 // parse the raw arg string into { repos, profile, specialization, outDir }.
 // `--profile <name>` sets the profile; `--for <text>` adds free-text
 // specialization; `--out <abs>` sets the absolute output base (quote
-// multi-word values); other non-flag tokens are repos.
+// multi-word values); other non-flag tokens are repos. agents often misspell
+// flags with a single dash (-for): accept those as their double-dash form,
+// with a warning, instead of degrading flag + value into two bogus repos.
 function parseArgs(argstr) {
   const tokens = tokenize(String(argstr == null ? '' : argstr))
+  const warnings = []
   const repos = []
   let profile = null
   let specialization = null
@@ -63,7 +66,11 @@ function parseArgs(argstr) {
   let stamp = null
   let date = null
   for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i]
+    let t = tokens[i]
+    if (/^-(profile|for|out|stamp|date)(=.*)?$/.test(t)) {
+      warnings.push(`read ${t} as -${t} (flags are double-dash)`)
+      t = `-${t}`
+    }
     if (t === '--profile' || t === '--for' || t === '--out' ||
         t === '--stamp' || t === '--date') {
       const next = tokens[i + 1]
@@ -83,8 +90,10 @@ function parseArgs(argstr) {
       stamp = t.slice('--stamp='.length) || stamp
     } else if (t.startsWith('--date=')) {
       date = t.slice('--date='.length) || date
-    } else if (t.startsWith('--')) {
-      // unknown flag - ignore
+    } else if (t.startsWith('-')) {
+      // unknown flag (either dash style) - ignore, but say so: a silently
+      // dropped token is invisible to the agent that sent it
+      warnings.push(`ignoring unknown flag ${t}`)
     } else {
       repos.push(splitRepoToken(t))
     }
@@ -93,7 +102,7 @@ function parseArgs(argstr) {
   // structured-object branch in normalizeArgs, which filters pathless items.
   return {
     repos: repos.filter(r => r.path), profile, specialization, outDir, stamp,
-    date,
+    date, warnings,
   }
 }
 
@@ -103,33 +112,41 @@ function parseArgs(argstr) {
 // DEFENSIVELY - it isn't a documented input shape, but a programmatic caller
 // could hand one over, so we coerce it rather than mis-parse it.
 function normalizeArgs(args) {
-  // A structured object may arrive serialized to JSON (some invocation paths
-  // stringify it in transit), landing here as a string. Recover it before
+  // A structured object (or array) may arrive serialized to JSON (some
+  // invocation paths stringify it in transit). Recover it before
   // falling back to raw-arg parsing: a JSON object run through parseArgs would
   // be tokenized, and since none of its fragments match --profile/--for/--out,
   // every fragment (and every word of the --for text) degrades into a bogus
   // repo, fanning out junk reviews.
-  if (typeof args === 'string' && args.trim().startsWith('{')) {
+  if (typeof args === 'string' && /^[{[]/.test(args.trim())) {
     let parsed = null
     try {
       parsed = JSON.parse(args.trim())
     } catch {
       // not valid JSON - leave it for raw-arg-string parsing below
     }
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    if (parsed && typeof parsed === 'object') {
       return normalizeArgs(parsed)
     }
   }
   if (typeof args === 'string' || args == null) {
     return parseArgs(args == null ? '' : args)
   }
+  // a bare array is an unambiguous repo list; coerce it rather than reject
+  // (rejecting it has stranded agents on "no repositories given")
+  if (Array.isArray(args)) return normalizeArgs({ repos: args })
+  const warnings = []
   const profile = typeof args.profile === 'string' ? args.profile : null
   const specialization =
     typeof args.specialization === 'string' ? args.specialization : null
   const outDir = typeof args.outDir === 'string' ? args.outDir : null
   const stamp = typeof args.stamp === 'string' ? args.stamp : null
   const date = typeof args.date === 'string' ? args.date : null
-  const list = Array.isArray(args.repos) ? args.repos : []
+  let list = Array.isArray(args.repos) ? args.repos : []
+  if (typeof args.repos === 'string') {
+    warnings.push('repos should be an array of paths; wrapped the string')
+    list = [args.repos]
+  }
   const repos = list
     .map(r => {
       if (typeof r === 'string') return splitRepoToken(r)
@@ -138,8 +155,31 @@ function normalizeArgs(args) {
       return { path, flavor }
     })
     .filter(r => r.path)
-  return { repos, profile, specialization, outDir, stamp, date }
+  return { repos, profile, specialization, outDir, stamp, date, warnings }
 }
+
+// one-line description of a received args value, for the no-repositories
+// error: the caller is usually an agent that mis-shaped its input, so show
+// what arrived so it can see how it was interpreted.
+function describeArgs(args) {
+  if (args == null) return 'nothing'
+  if (typeof args === 'string') {
+    const s = args.length > 80 ? `${args.slice(0, 77)}...` : args
+    return `the string ${JSON.stringify(s)}`
+  }
+  if (Array.isArray(args)) return `an array of ${args.length} item(s)`
+  if (typeof args === 'object') {
+    return `an object with keys {${Object.keys(args).join(', ')}}`
+  }
+  return `a ${typeof args}`
+}
+
+// appended to the no-repositories error so a failed call teaches the fix
+const ARGS_HINT =
+  'pass args as ONE raw string, e.g. \'/abs/path/repo --profile job ' +
+  '--for "role text"\' (double-dash flags; non-flag tokens are repo ' +
+  'paths), or as an object {repos: ["/abs/path/repo"], profile, ' +
+  'specialization, outDir}'
 
 // the world of allowed profiles. a profile sets WHO is judging and the verdict
 // scale; flavor (what the repo is for) is orthogonal. framing text per profile
@@ -666,10 +706,21 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp,
 // Fully SEQUENTIAL by design: repos one at a time, and the five lens reviewers
 // one at a time within each. Only one clone/build/run is ever active, so
 // profiling/benchmarks are uncontended and RAM stays bounded.
-const { repos, profile: profileName, specialization, outDir, stamp, date } =
-  normalizeArgs(args)
+const { repos, profile: profileName, specialization, outDir, stamp, date,
+  warnings } = normalizeArgs(args)
+for (const w of warnings || []) log(`WARNING: args - ${w}`)
 const profile = resolveProfile(profileName, specialization)
-if (!repos.length) return { error: 'no repositories given', profile: profile.name }
+if (!repos.length) {
+  return {
+    error: `no repositories given - received ${describeArgs(args)}; ` +
+      ARGS_HINT,
+    profile: profile.name,
+  }
+}
+// echo the parsed interpretation so a mis-parse is visible immediately
+log(`args parsed: repos [${repos.map(
+  r => r.path + (r.flavor ? `:${r.flavor}` : '')).join(', ')}]` +
+  (specialization ? `, for "${specialization}"` : ''))
 // absolute output base passed by the command (--out <pwd>/repo-review-out) so
 // docs land deterministically at the invocation dir regardless of where lens
 // agents cd to; falls back to the relative default for direct invocation.

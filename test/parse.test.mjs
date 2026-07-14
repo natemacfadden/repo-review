@@ -4,12 +4,13 @@ import { loadPure } from './extract.mjs'
 
 const WF = 'plugins/repo-review/lib/repo-review.js'
 const {
-  splitRepoToken, parseArgs, normalizeArgs, repoSlug, repoOutDir,
+  splitRepoToken, parseArgs, normalizeArgs, describeArgs, repoSlug, repoOutDir,
   findSlugCollisions,
 } = loadPure(WF, [
   'splitRepoToken',
   'parseArgs',
   'normalizeArgs',
+  'describeArgs',
   'repoSlug',
   'repoOutDir',
   'findSlugCollisions',
@@ -69,7 +70,7 @@ test('splitRepoToken: windows drive letter survives', () => {
 
 const EMPTY = {
   repos: [], profile: null, specialization: null, outDir: null, stamp: null,
-  date: null,
+  date: null, warnings: [],
 }
 
 test('parseArgs: empty -> no repos, profile, specialization, outDir', () => {
@@ -90,6 +91,7 @@ test('parseArgs: multiple repos with per-repo flavors', () => {
     outDir: null,
     stamp: null,
     date: null,
+    warnings: [],
   })
 })
 
@@ -101,6 +103,7 @@ test('parseArgs: --profile with a value, anywhere', () => {
     outDir: null,
     stamp: null,
     date: null,
+    warnings: [],
   })
 })
 
@@ -112,6 +115,7 @@ test('parseArgs: --profile=value form', () => {
     outDir: null,
     stamp: null,
     date: null,
+    warnings: [],
   })
 })
 
@@ -123,10 +127,11 @@ test('parseArgs: --profile with no value is ignored', () => {
     outDir: null,
     stamp: null,
     date: null,
+    warnings: [],
   })
 })
 
-test('parseArgs: unknown flags are ignored, not treated as repos', () => {
+test('parseArgs: unknown flags are ignored (with a warning), not repos', () => {
   assert.deepEqual(parseArgs('./a --bogus ./b'), {
     repos: [{ path: './a', flavor: null }, { path: './b', flavor: null }],
     profile: null,
@@ -134,6 +139,7 @@ test('parseArgs: unknown flags are ignored, not treated as repos', () => {
     outDir: null,
     stamp: null,
     date: null,
+    warnings: ['ignoring unknown flag --bogus'],
   })
 })
 
@@ -146,6 +152,7 @@ test('parseArgs: --for captures a quoted multi-word value', () => {
     outDir: null,
     stamp: null,
     date: null,
+    warnings: [],
   })
 })
 
@@ -215,6 +222,7 @@ test('normalizeArgs: structured object passes through (outDir, stamp, date)', ()
       outDir: '/abs/out',
       stamp: 'run9',
       date: '2025-01-15',
+      warnings: [],
     },
   )
 })
@@ -235,6 +243,7 @@ test('normalizeArgs: string repo items are split', () => {
     outDir: null,
     stamp: null,
     date: null,
+    warnings: [],
   })
 })
 
@@ -246,11 +255,16 @@ test('normalizeArgs: unknown flavor coerced to null', () => {
     outDir: null,
     stamp: null,
     date: null,
+    warnings: [],
   })
 })
 
-test('normalizeArgs: bad repos shape -> empty; pathless items dropped', () => {
-  assert.deepEqual(normalizeArgs({ repos: 'nope' }), EMPTY)
+test('normalizeArgs: repos-as-string wraps (warned); pathless dropped', () => {
+  // a single-path string under repos is unambiguous - wrap it instead of
+  // silently reviewing nothing (this exact shape has stranded agents)
+  const out = normalizeArgs({ repos: 'nope' })
+  assert.deepEqual(out.repos, [{ path: 'nope', flavor: null }])
+  assert.equal(out.warnings.length, 1)
   assert.deepEqual(normalizeArgs({ repos: [{ flavor: 'personal' }] }), EMPTY)
 })
 
@@ -277,8 +291,46 @@ test('normalizeArgs: malformed JSON-ish string falls through to parseArgs', () =
   assert.deepEqual(normalizeArgs(s), parseArgs(s))
 })
 
-test('normalizeArgs: JSON array string is not treated as an object', () => {
-  // only a JSON *object* is recovered; an array string is left to parseArgs.
-  const s = '["./a", "./b"]'
-  assert.deepEqual(normalizeArgs(s), parseArgs(s))
+test('normalizeArgs: JSON array string recovers to a repo list', () => {
+  // a serialized array is as unambiguous as a serialized object - recover it
+  // instead of tokenizing JSON fragments into bogus repo paths.
+  assert.deepEqual(normalizeArgs('["./a", "./b"]').repos, [
+    { path: './a', flavor: null },
+    { path: './b', flavor: null },
+  ])
+})
+
+test('parseArgs: single-dash known flags corrected, with warnings', () => {
+  const out = parseArgs('./a -profile job -for "a RE role"')
+  assert.deepEqual(out.repos, [{ path: './a', flavor: null }])
+  assert.equal(out.profile, 'job')
+  assert.equal(out.specialization, 'a RE role')
+  assert.equal(out.warnings.length, 2)
+  assert.match(out.warnings[0], /-profile/)
+})
+
+test('normalizeArgs: bare array coerces to a repo list', () => {
+  const out = normalizeArgs(['./a', './b:personal'])
+  assert.deepEqual(out.repos, [
+    { path: './a', flavor: null },
+    { path: './b', flavor: 'personal' },
+  ])
+})
+
+test('normalizeArgs: JSON-serialized array recovers', () => {
+  assert.deepEqual(normalizeArgs('["./a"]').repos,
+    [{ path: './a', flavor: null }])
+})
+
+test('normalizeArgs: repos given as a string wraps, with a warning', () => {
+  const out = normalizeArgs({ repos: './a' })
+  assert.deepEqual(out.repos, [{ path: './a', flavor: null }])
+  assert.equal(out.warnings.length, 1)
+})
+
+test('describeArgs: names the received shape', () => {
+  assert.equal(describeArgs(null), 'nothing')
+  assert.match(describeArgs('x --for y'), /the string "x --for y"/)
+  assert.equal(describeArgs([1, 2]), 'an array of 2 item(s)')
+  assert.equal(describeArgs({ repo: 'x' }), 'an object with keys {repo}')
 })
