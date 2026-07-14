@@ -1,10 +1,8 @@
 # conda environment for repo-review (dev + CI tooling)
 # install: conda env create -f environment.yml
 #
-# layer 1 (runtime): this file provisions node via conda-forge
-# layer 2 (tooling): the dev/CI tools are self-contained - node's built-in test
-#   runner plus the checkers in scripts/. package.json declares NO dependencies;
-#   it only provides `npm run check` / `npm test` aliases (no node_modules).
+# provisions node via conda-forge; every other dev/CI tool is self-contained
+# (see README "Development" - no npm dependencies, no node_modules)
 name: repo-review
 channels:
   - conda-forge

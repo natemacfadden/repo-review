@@ -11,9 +11,8 @@ judging and how to grade; default a general code-quality review) and a
 
 ## How the review is shaped
 
-- **Lenses** - every run judges the same five: performance, correctness,
-  engineering, taste & positioning, documentation. Each is a separate reviewer
-  working in its own clone, so the takes stay independent.
+- **Lenses** - the same five every run, each a separate reviewer working in
+  its own clone, so the takes stay independent.
 - **`--profile`** - *who* is judging and the verdict scale. `general`
   (default) grades it as software (Excellent-Poor); `--profile job` grades it
   as a hiring committee (Strong Hire-No-Hire); `--profile oss-audit` asks
@@ -92,18 +91,14 @@ lives only in `~/.claude/`.
 Two layers, on purpose:
 
 - **Command / skill** (`commands/review.md` -> `/repo-review:review`) - the
-  user-facing entry point. It parses the arguments, runs `pwd` to capture the
+  user-facing **doorman**. It parses the arguments, runs `pwd` to capture the
   invocation directory, injects `--out`, serves `--help`/usage, then hands a
   fully-formed call to the engine.
 - **Workflow engine** (`lib/repo-review.js`) - Anthropic's deterministic
-  *workflow* construct, which does the orchestration: it spawns the worker
-  agents, reconciles their scores in code, and drives the synthesis.
-
-In model terms: the command is a **doorman** that interprets the request and
-sets up the arguments and output path; the engine then spawns the models that
-actually think - a flavor detector, five **independent** lens reviewers (each
-in its own clone, so the takes stay unbiased), and a synthesizer that writes
-the memo. Score reconciliation between reviewers is plain code, not a model.
+  *workflow* construct, which does the orchestration: it spawns the models
+  that actually think - a flavor detector, five **independent** lens reviewers
+  (each in its own clone, so the takes stay unbiased), and a synthesizer that
+  writes the memo - and reconciles their scores in plain code, not a model.
 
 **Why have the command at all, instead of just the workflow?** The workflow
 runs in a restricted, deterministic sandbox and is invoked programmatically by
@@ -160,10 +155,9 @@ Run all checks (the same entry point CI runs):
 bash scripts/check.sh                 # or: npm run check
 ```
 
-It runs ascii, editorconfig, JSON-manifest, workflow-syntax, meta-validity, and
-`claude plugin validate --strict` checks, plus the unit-test suite, collecting
-every failure before exiting non-zero. Tools that aren't installed (and the
-tests, until they exist) are skipped, not failed.
+It runs lint, manifest, and workflow checks plus the unit-test suite (the
+sections it prints are the authoritative list), collecting every failure
+before exiting non-zero. Tools that aren't installed are skipped, not failed.
 
 Run just the unit tests during development:
 

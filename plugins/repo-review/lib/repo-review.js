@@ -50,46 +50,43 @@ function tokenize(str) {
   return out
 }
 
-// parse the raw arg string into { repos, profile, specialization, outDir }.
-// `--profile <name>` sets the profile; `--for <text>` adds free-text
-// specialization; `--out <abs>` sets the absolute output base (quote
-// multi-word values); other non-flag tokens are repos. agents often misspell
-// flags with a single dash (-for): accept those as their double-dash form,
-// with a warning, instead of degrading flag + value into two bogus repos.
+// the flags, mapped to their result keys - the single source both parsing
+// regexes are built from, so adding a flag is a one-line change.
+const FLAGS = {
+  profile: 'profile', for: 'specialization', out: 'outDir',
+  stamp: 'stamp', date: 'date',
+}
+const FLAG_ALT = Object.keys(FLAGS).join('|')
+// agents often misspell flags with a single dash (-for): accept those as
+// their double-dash form, with a warning, instead of degrading flag + value
+// into two bogus repos.
+const SINGLE_DASH_RE = new RegExp(`^-(${FLAG_ALT})(=.*)?$`)
+const FLAG_RE = new RegExp(`^--(${FLAG_ALT})(?:=(.*))?$`)
+
+// parse the raw arg string into { repos, profile, specialization, outDir,
+// stamp, date, warnings }. flags take `--flag value` or `--flag=value` form
+// (quote multi-word values); other non-flag tokens are repos.
 function parseArgs(argstr) {
   const tokens = tokenize(String(argstr == null ? '' : argstr))
   const warnings = []
   const repos = []
-  let profile = null
-  let specialization = null
-  let outDir = null
-  let stamp = null
-  let date = null
+  const opts = {
+    profile: null, specialization: null, outDir: null, stamp: null, date: null,
+  }
   for (let i = 0; i < tokens.length; i++) {
     let t = tokens[i]
-    if (/^-(profile|for|out|stamp|date)(=.*)?$/.test(t)) {
+    if (SINGLE_DASH_RE.test(t)) {
       warnings.push(`read ${t} as -${t} (flags are double-dash)`)
       t = `-${t}`
     }
-    if (t === '--profile' || t === '--for' || t === '--out' ||
-        t === '--stamp' || t === '--date') {
+    const m = FLAG_RE.exec(t)
+    if (m) {
+      const key = FLAGS[m[1]]
       const next = tokens[i + 1]
-      const val = next && !next.startsWith('--') ? tokens[++i] : null
-      if (t === '--profile') profile = val || profile
-      else if (t === '--for') specialization = val || specialization
-      else if (t === '--out') outDir = val || outDir
-      else if (t === '--stamp') stamp = val || stamp
-      else date = val || date
-    } else if (t.startsWith('--profile=')) {
-      profile = t.slice('--profile='.length) || profile
-    } else if (t.startsWith('--for=')) {
-      specialization = t.slice('--for='.length) || specialization
-    } else if (t.startsWith('--out=')) {
-      outDir = t.slice('--out='.length) || outDir
-    } else if (t.startsWith('--stamp=')) {
-      stamp = t.slice('--stamp='.length) || stamp
-    } else if (t.startsWith('--date=')) {
-      date = t.slice('--date='.length) || date
+      const val = m[2] !== undefined
+        ? m[2]
+        : next && !next.startsWith('--') ? tokens[++i] : null
+      opts[key] = val || opts[key]
     } else if (t.startsWith('-')) {
       // unknown flag (either dash style) - ignore, but say so: a silently
       // dropped token is invisible to the agent that sent it
@@ -100,10 +97,7 @@ function parseArgs(argstr) {
   }
   // drop empty-path repos (e.g. a quoted "" token) for parity with the
   // structured-object branch in normalizeArgs, which filters pathless items.
-  return {
-    repos: repos.filter(r => r.path), profile, specialization, outDir, stamp,
-    date, warnings,
-  }
+  return { repos: repos.filter(r => r.path), ...opts, warnings }
 }
 
 // normalize the command's arguments into { repos: [{path, flavor}], profile,

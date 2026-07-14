@@ -122,10 +122,8 @@ pin chosen flavors as `path:flavor`, append `--profile <name>` and
 newlines break the tool-call serialization). Those answer-driven edits are the
 ONLY changes you may make to the user's arguments.
 
-Also state the estimated cost - roughly 30 minutes to 2 hours and 30-50 USD per
-repo on
-metered API pricing (heavily subsidized on a Claude subscription; within a
-100 USD/mo Max plan), scaled by the repo count. Only launch once the user
+Also state the estimated time and cost from the Cost & expectations section
+above, scaled by the repo count. Only launch once the user
 explicitly confirms (the confirmation may be the final question of the same
 round); if they decline, stop without running. You may inspect the arguments
 to see which flags are present, but beyond the answer-driven edits above pass
@@ -135,13 +133,10 @@ them through unchanged - the workflow does the real parsing.
 command invocation is your authorization), use it. First run
 `pwd`, `date -u +%Y%m%dT%H%M%SZ`, and `date +%Y-%m-%d` to capture the absolute
 invocation directory, a run timestamp, and today's date, then append
-`--out "<pwd>/repo-review-out"` (so review docs land deterministically there -
-not inside a lens agent's temp clone, which gets deleted), `--stamp <timestamp>`
-(so a re-run nests under a fresh dir instead of clobbering the previous run),
-and `--date <date>` (the engine can't read the clock, so this passes today's
-date to the reviewer agents - it stops them flagging recent dates, versions, or
-citations as "future" or fabricated). Replace `<pwd>`, `<timestamp>`, and
-`<date>` with the actual values and keep the quotes in case the path has spaces:
+`--out "<pwd>/repo-review-out"`, `--stamp <timestamp>`, and `--date <date>` -
+each flag's purpose and omission behavior is documented in Usage above.
+Replace `<pwd>`, `<timestamp>`, and `<date>` with the actual values and keep
+the quotes in case the path has spaces:
 
 ```
 Workflow({
@@ -154,10 +149,7 @@ Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
 (except for flavors/`--profile`/`--for` the user chose in the pre-launch
 questions, folded in as described above) with `--out`, `--stamp`, and `--date`
 appended. The engine does the parsing (see
-Usage above); do not restructure the arguments into an object yourself. If
-`--out` is omitted the output base falls back to a relative `repo-review-out`;
-if `--stamp` is omitted docs land directly in `<out>/<repo>/`; if `--date` is
-omitted the reviewers simply get no current-date note.
+Usage above); do not restructure the arguments into an object yourself.
 
 **Fallback** (no Workflow tool). The Workflow engine is only deterministic
 orchestration - the reviewing is agent work, so reproduce the structure with
