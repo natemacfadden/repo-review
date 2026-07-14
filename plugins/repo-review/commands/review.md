@@ -150,7 +150,8 @@ deliberately not a registered workflow, so `Workflow({name: "repo-review"})`
 fails with "Workflow not found"; do not try it first and fall back.
 
 Right after launching, tell the user how to watch the workers (see
-Monitoring below) with the actual out dir substituted in.
+Monitoring below): the peek command verbatim, and the progress-file tail
+with the actual out dir substituted in.
 
 Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
 (except for flavors/`--profile`/`--for` the user chose in the pre-launch
@@ -164,21 +165,30 @@ When the user asks what the review is doing (or it looks stuck), answer with
 FACTS from the ground truth below - never speculate about what an agent is
 "probably" doing, and never guess at failure causes you have not verified:
 
-- **Live step log**: each lens reviewer appends timestamped
-  step/bound/outcome lines to `<out>/<repo>/[<stamp>/]<lens>.progress` while
-  it works. `tail -n 5 <out>/<repo>/*/<lens>.progress` (glob it) reports
-  every worker's
-  current step; `tail -f` watches live. Give the user this command (with the
-  real path) right after launch.
-- **Transcripts** are the authority for a stuck or dead agent: every tool
-  call and result is in
+- **Enforced peek (primary)**: `node ${CLAUDE_PLUGIN_ROOT}/scripts/peek.mjs`
+  renders every worker's recent tool calls straight from the harness-written
+  transcripts. The harness appends each call the moment it is made, so this
+  view cannot be skipped, delayed, or faked by a worker - it stays truthful
+  even when a worker ignores its progress-file instruction. It shows each
+  worker's lens, running/finished state, last-activity age, and recent
+  commands. Give the user this command verbatim right after launch.
+- **Live step log (narrative)**: each lens reviewer is instructed to append
+  timestamped step/bound/outcome lines to
+  `<out>/<repo>/[<stamp>/]<lens>.progress` while it works; `tail -f` it for
+  intent and declared time bounds - the one thing only the worker can state.
+  It is model-written: treat it as narrative, not ground truth. A missing or
+  stale progress file means the worker skipped its instruction, NOT that the
+  run is stuck; check the peek before concluding anything.
+- **Transcripts** are the raw authority the peek renders: every tool call
+  and result is in
   `<project transcript dir>/<session-id>/subagents/workflows/<run-id>/agent-<id>.jsonl`,
-  and `journal.jsonl` beside it records each agent's return value. Read the
-  tail before explaining any stall - e.g. a background task whose output
-  file is 0 bytes may simply be a healthy compute-bound job that has not
-  flushed yet; the transcript shows what was actually launched.
-- A stalled worker is attributable via its progress file: the last line
-  names the step it is stuck in and the time bound it declared.
+  and `journal.jsonl` beside it records spawn order and each agent's return
+  value. Read the tail before explaining any stall - e.g. a background task
+  whose output file is 0 bytes may simply be a healthy compute-bound job that
+  has not flushed yet; the transcript shows what was actually launched.
+- A stalled worker is attributable by combining the two: the peek shows the
+  last command it actually launched; its progress file (if written) names
+  the step and the time bound it declared.
 
 **Fallback** (no Workflow tool). The Workflow engine is only deterministic
 orchestration - the reviewing is agent work, so reproduce the structure with
