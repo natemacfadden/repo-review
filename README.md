@@ -54,37 +54,8 @@ For the full options reference - profiles, flavors, `--for`, `--out` - run:
 (The command is `/repo-review:review`: Claude Code namespaces plugin commands
 as `/<plugin>:<command>`.)
 
-## Update
-
-Picking up a newer pushed version takes a full reinstall, not just a
-marketplace refresh. `/plugin marketplace update` refreshes the catalog clone,
-but the installed plugin is a separate cached snapshot that only changes when
-you reinstall - so `marketplace update` + `/reload-plugins` alone does **not**
-pick up changes (observed in practice). Run all four:
-
-```
-/plugin uninstall repo-review@repo-review
-/plugin marketplace update repo-review
-/plugin install repo-review@repo-review
-/reload-plugins
-```
-
-The `uninstall` also drops any renamed or removed command so it does not linger.
-
-## Uninstall
-
-Run as slash commands inside a Claude Code session:
-
-```
-/plugin uninstall repo-review@repo-review
-/plugin marketplace remove repo-review
-/reload-plugins
-```
-
-Removing the marketplace also uninstalls any plugin installed from it, so the
-first line is optional. `/reload-plugins` applies the removal to the current
-session without a restart. Nothing here touches the source repo - plugin state
-lives only in `~/.claude/`.
+Updating and uninstalling are at the [end of this README](#update) - kept
+last so `cat README.md` leaves the update steps on screen.
 
 ## Architecture
 
@@ -164,6 +135,38 @@ Run just the unit tests during development:
 ```
 npm test
 ```
+
+## Update
+
+Picking up a newer pushed version takes a full reinstall, not just a
+marketplace refresh. `/plugin marketplace update` refreshes the catalog clone,
+but the installed plugin is a separate cached snapshot that only changes when
+you reinstall - so `marketplace update` + `/reload-plugins` alone does **not**
+pick up changes (observed in practice). Run all four:
+
+```
+/plugin uninstall repo-review@repo-review
+/plugin marketplace update repo-review
+/plugin install repo-review@repo-review
+/reload-plugins
+```
+
+The `uninstall` also drops any renamed or removed command so it does not linger.
+
+## Uninstall
+
+Run as slash commands inside a Claude Code session:
+
+```
+/plugin uninstall repo-review@repo-review
+/plugin marketplace remove repo-review
+/reload-plugins
+```
+
+Removing the marketplace also uninstalls any plugin installed from it, so the
+first line is optional. `/reload-plugins` applies the removal to the current
+session without a restart. Nothing here touches the source repo - plugin state
+lives only in `~/.claude/`.
 
 ## License
 
