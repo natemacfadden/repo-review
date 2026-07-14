@@ -145,6 +145,10 @@ Workflow({
 })
 ```
 
+Invoke by `scriptPath` EXACTLY as shown - NEVER by name. The engine is
+deliberately not a registered workflow, so `Workflow({name: "repo-review"})`
+fails with "Workflow not found"; do not try it first and fall back.
+
 Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
 (except for flavors/`--profile`/`--for` the user chose in the pre-launch
 questions, folded in as described above) with `--out`, `--stamp`, and `--date`
