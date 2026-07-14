@@ -149,11 +149,36 @@ Invoke by `scriptPath` EXACTLY as shown - NEVER by name. The engine is
 deliberately not a registered workflow, so `Workflow({name: "repo-review"})`
 fails with "Workflow not found"; do not try it first and fall back.
 
+Right after launching, tell the user how to watch the workers (see
+Monitoring below) with the actual out dir substituted in.
+
 Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
 (except for flavors/`--profile`/`--for` the user chose in the pre-launch
 questions, folded in as described above) with `--out`, `--stamp`, and `--date`
 appended. The engine does the parsing (see
 Usage above); do not restructure the arguments into an object yourself.
+
+## Monitoring - telling the user what the workers are doing
+
+When the user asks what the review is doing (or it looks stuck), answer with
+FACTS from the ground truth below - never speculate about what an agent is
+"probably" doing, and never guess at failure causes you have not verified:
+
+- **Live step log**: each lens reviewer appends timestamped
+  step/bound/outcome lines to `<out>/<repo>/[<stamp>/]<lens>.progress` while
+  it works. `tail -n 5 <out>/<repo>/*/<lens>.progress` (glob it) reports
+  every worker's
+  current step; `tail -f` watches live. Give the user this command (with the
+  real path) right after launch.
+- **Transcripts** are the authority for a stuck or dead agent: every tool
+  call and result is in
+  `<project transcript dir>/<session-id>/subagents/workflows/<run-id>/agent-<id>.jsonl`,
+  and `journal.jsonl` beside it records each agent's return value. Read the
+  tail before explaining any stall - e.g. a background task whose output
+  file is 0 bytes may simply be a healthy compute-bound job that has not
+  flushed yet; the transcript shows what was actually launched.
+- A stalled worker is attributable via its progress file: the last line
+  names the step it is stuck in and the time bound it declared.
 
 **Fallback** (no Workflow tool). The Workflow engine is only deterministic
 orchestration - the reviewing is agent work, so reproduce the structure with

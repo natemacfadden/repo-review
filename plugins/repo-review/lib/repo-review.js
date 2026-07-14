@@ -567,6 +567,7 @@ function reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date) {
   const slug = repoSlug(repo.path)
   const tmp = `/tmp/rr-${slug}-${lens.key}`
   const outPath = `${repoOutDir(outBase, slug, stamp)}/${lens.key}.md`
+  const progressPath = `${repoOutDir(outBase, slug, stamp)}/${lens.key}.progress`
   const verdicts = profile.verdicts.join(', ')
   // each lens gets a hands-on mandate scoped to its axis (deep test-authoring
   // for correctness, profiling for performance, light/read-oriented for
@@ -609,6 +610,25 @@ function reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date) {
       'memory (e.g. free -m). If memory is tight or an op risks an OOM ' +
       'kill, downgrade that step to a read-only assessment and say so - ' +
       'never risk OOM.',
+    'LIVE PROGRESS - the operator watches this run ONLY through your ' +
+      `progress file, ${progressPath} (mkdir -p its dir first). BEFORE ` +
+      'every substantive step (clone, build, each probe/test/benchmark) ' +
+      'append one line: `date "+%H:%M:%S"`, the step, and its time bound - ' +
+      'then append the outcome when it finishes. Write the line before ' +
+      'starting, not after, so a stall is attributable to a named step. ' +
+      'Never go more than a few minutes without a line; make long steps ' +
+      'log from within (per-iteration appends).',
+    'TIME DISCIPLINE: every command gets an explicit, SMALL time limit - ' +
+      'default 120 seconds (Bash tool timeout, or prefix `timeout 120`). ' +
+      'Raising a bound must be deliberate: first prove the step at smoke ' +
+      'scale, then rerun with a higher bound and record the new bound and ' +
+      'why in the progress file. NEVER launch unbounded compute - no ' +
+      'uncapped searches or infinite node/iteration limits; size every ' +
+      'probe to finish in minutes. Long runs must stream output unbuffered ' +
+      '(python3 -u / flush=True) so partial progress is visible, and a ' +
+      'background task with an empty output file is indistinguishable ' +
+      'from a hung one - do not poll-wait on it; bound it and check the ' +
+      'bound.',
     'EVIDENCE & ATTRIBUTION: for any defect or claim, cite the exact ' +
       'file:line in the repo and quote the offending text. Never attribute ' +
       'to the repo anything that came from THESE instructions (the example ' +
