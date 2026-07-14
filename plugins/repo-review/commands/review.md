@@ -83,26 +83,53 @@ The cost is dominated by the per-lens code-running review itself, not by waste
 
 Pass the command arguments through to the workflow unchanged - it parses the
 tokens itself (see Usage above). Do not pre-parse the repos or flags yourself.
+The one exception is the pre-launch questions below: answers the user gives
+there are folded into the argument string before launch.
 
 ## Run
 
 **Confirm inputs and cost before launching.** This is an expensive,
 long-running operation, so do NOT launch it silently. First summarize what will
-run and flag any review-shaping fields the user left unspecified, with their
-defaults:
-- profile (default `general`; alternatives `job`, `oss-audit`,
-  `student-project`) - sets the audience and verdict scale
-- specialization via `--for` (default none) - e.g. a target role for `job`
-- each repo's flavor (auto-detected unless pinned as `path:flavor`)
+run. Then, for every review-shaping field the user left unspecified, don't just
+mention the default - ask about it, grounded in the repo itself. Take a quick
+peek at each repo first (README, top-level listing - seconds of reading, no
+build) so the questions are informed, then ask one round of questions via
+AskUserQuestion (plain-text questions if that tool is unavailable):
 
-Ask whether the user wants to set any of these or proceed with the defaults.
+- **flavor**, for each repo not pinned as `path:flavor`: offer the four
+  flavors (`performance`, `research`, `production`, `personal`) plus
+  auto-detect, recommending the one the peek suggests with a one-line reason
+  (e.g. "benchmarks/ and a perf-focused README suggest `performance`"). For
+  batches of more than 3 repos, ask once whether to pin flavors repo-by-repo
+  or auto-detect the lot.
+- **profile**, when `--profile` is absent: offer `general` (recommended
+  default), `job`, `oss-audit`, `student-project`, each described in terms of
+  this repo ("judge <name> as a hiring-committee portfolio piece", ...).
+- **specialization**, when `--for` is absent: suggest 2-3 plausible values
+  based on the peek and the chosen or likely profile (e.g. for `job` on an ML
+  repo, "an ML research-engineer role"), plus "none". AskUserQuestion always
+  appends an "Other" choice with a free-text field - for this question that
+  free entry is the star, since the best `--for` is the user's own phrasing;
+  word the question to invite it ("pick a suggestion, or describe your own
+  under Other").
+
+The point is to make setting these fields the easy path, not to gate the run:
+every question carries a clearly-marked default, and a user who picks the
+defaults gets exactly today's behavior (auto-detected flavors, `general`
+profile, no specialization). Fold the answers back into the argument string -
+pin chosen flavors as `path:flavor`, append `--profile <name>` and
+`--for "<text>"` (keep the `--for` value quoted and on a single line; embedded
+newlines break the tool-call serialization). Those answer-driven edits are the
+ONLY changes you may make to the user's arguments.
+
 Also state the estimated cost - roughly 30 minutes to 2 hours and 30-50 USD per
 repo on
 metered API pricing (heavily subsidized on a Claude subscription; within a
 100 USD/mo Max plan), scaled by the repo count. Only launch once the user
-explicitly confirms; if they decline, stop without running. You may inspect the
-arguments to see which flags are present, but pass them through unchanged - the
-workflow does the real parsing.
+explicitly confirms (the confirmation may be the final question of the same
+round); if they decline, stop without running. You may inspect the arguments
+to see which flags are present, but beyond the answer-driven edits above pass
+them through unchanged - the workflow does the real parsing.
 
 **Preferred - Workflow orchestration.** If the Workflow tool is available (this
 command invocation is your authorization), use it. First run
@@ -124,7 +151,9 @@ Workflow({
 ```
 
 Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
-with `--out`, `--stamp`, and `--date` appended. The engine does the parsing (see
+(except for flavors/`--profile`/`--for` the user chose in the pre-launch
+questions, folded in as described above) with `--out`, `--stamp`, and `--date`
+appended. The engine does the parsing (see
 Usage above); do not restructure the arguments into an object yourself. If
 `--out` is omitted the output base falls back to a relative `repo-review-out`;
 if `--stamp` is omitted docs land directly in `<out>/<repo>/`; if `--date` is
