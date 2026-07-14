@@ -7,7 +7,7 @@ export const meta = {
   description:
     'Clone, build, run, and review repos across five lenses; synthesize.',
   whenToUse:
-    'Stand repos up and review them; pass repo paths (optionally path:flavor).',
+    'Stand repos up and review them; args: repos and --profile/--for/--out.',
   phases: [
     { title: 'Detect', detail: 'per-repo flavor detection (when not given)' },
     { title: 'Reviews', detail: 'five lens reviewers per repo, one at a time' },
@@ -174,13 +174,6 @@ function describeArgs(args) {
   return `a ${typeof args}`
 }
 
-// appended to the no-repositories error so a failed call teaches the fix
-const ARGS_HINT =
-  'pass args as ONE raw string, e.g. \'/abs/path/repo --profile job ' +
-  '--for "role text"\' (double-dash flags; non-flag tokens are repo ' +
-  'paths), or as an object {repos: ["/abs/path/repo"], profile, ' +
-  'specialization, outDir}'
-
 // the world of allowed profiles. a profile sets WHO is judging and the verdict
 // scale; flavor (what the repo is for) is orthogonal. framing text per profile
 // is added at the prompt-building step.
@@ -227,6 +220,21 @@ const PROFILES = {
   },
 }
 const DEFAULT_PROFILE = 'general'
+
+// single-source usage contract, built from the tables above so it can't
+// drift. advertised as the FIRST log line of every run, appended to the
+// no-repositories error, and printed verbatim by the review command's first
+// reply - so both a watching human and a mis-calling agent see the full
+// argument surface before anything can go wrong with it.
+const USAGE =
+  'usage: args is ONE raw string \'<repo-path[:flavor]>... ' +
+  '[--profile <name>] [--for "<text>"] [--out <abs-dir>] ' +
+  '[--stamp <token>] [--date <YYYY-MM-DD>]\' (or an object ' +
+  '{repos: ["<path>"], profile, specialization, outDir, stamp, date}). ' +
+  `flavors: ${KNOWN_FLAVORS.join('|')} (omit to auto-detect). profiles: ` +
+  `${Object.keys(PROFILES).join('|')} (default ${DEFAULT_PROFILE}). ` +
+  '--for layers free-text specialization on the profile (quote ' +
+  'multi-word values).'
 
 // resolve a profile name to its config. null/empty -> default; unknown throws
 // (a typo silently becoming `general` would misrepresent the review given).
@@ -706,6 +714,8 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp,
 // Fully SEQUENTIAL by design: repos one at a time, and the five lens reviewers
 // one at a time within each. Only one clone/build/run is ever active, so
 // profiling/benchmarks are uncontended and RAM stays bounded.
+// advertise the argument contract before anything else can fail on it
+log(USAGE)
 const { repos, profile: profileName, specialization, outDir, stamp, date,
   warnings } = normalizeArgs(args)
 for (const w of warnings || []) log(`WARNING: args - ${w}`)
@@ -713,7 +723,7 @@ const profile = resolveProfile(profileName, specialization)
 if (!repos.length) {
   return {
     error: `no repositories given - received ${describeArgs(args)}; ` +
-      ARGS_HINT,
+      USAGE,
     profile: profile.name,
   }
 }

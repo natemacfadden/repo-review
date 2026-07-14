@@ -4,13 +4,14 @@ import { loadPure } from './extract.mjs'
 
 const WF = 'plugins/repo-review/lib/repo-review.js'
 const {
-  splitRepoToken, parseArgs, normalizeArgs, describeArgs, repoSlug, repoOutDir,
-  findSlugCollisions,
+  splitRepoToken, parseArgs, normalizeArgs, describeArgs, USAGE, repoSlug,
+  repoOutDir, findSlugCollisions,
 } = loadPure(WF, [
   'splitRepoToken',
   'parseArgs',
   'normalizeArgs',
   'describeArgs',
+  'USAGE',
   'repoSlug',
   'repoOutDir',
   'findSlugCollisions',
@@ -333,4 +334,16 @@ test('describeArgs: names the received shape', () => {
   assert.match(describeArgs('x --for y'), /the string "x --for y"/)
   assert.equal(describeArgs([1, 2]), 'an array of 2 item(s)')
   assert.equal(describeArgs({ repo: 'x' }), 'an object with keys {repo}')
+})
+
+test('USAGE: advertises every flag, flavor, and profile', () => {
+  for (const flag of ['--profile', '--for', '--out', '--stamp', '--date']) {
+    assert.ok(USAGE.includes(flag), flag)
+  }
+  for (const f of ['performance', 'research', 'production', 'personal']) {
+    assert.ok(USAGE.includes(f), f)
+  }
+  for (const p of ['general', 'job', 'oss-audit', 'student-project']) {
+    assert.ok(USAGE.includes(p), p)
+  }
 })

@@ -3,11 +3,19 @@ description: Clone, build, run, and review a repo across five lenses
 argument-hint: <repo-path[:flavor]>... [--profile <name>] [--for <text>] [--out <dir>]
 ---
 
-**First, always print the plugin version.** Before doing anything else -
-showing usage or launching - read `version` from
+**First, always print the plugin version and the argument contract.** Before
+doing anything else - showing usage or launching - read `version` from
 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` and print
 `repo-review v<version>` as the first line of your response, so the running
-build is always identifiable for debugging.
+build is always identifiable for debugging. Directly below it, print this
+block verbatim (every run, not just on --help), so the argument surface is
+on screen before anything can be mis-passed:
+
+```
+args:     <repo-path[:flavor]>... [--profile <name>] [--for "<text>"] [--out <abs-dir>]
+flavors:  performance | research | production | personal   (omit = auto-detect)
+profiles: general | job | oss-audit | student-project      (default: general)
+```
 
 Review one or more code repositories by actually standing each up: clone,
 build, run a demo, then judge across five lenses (performance, correctness,
