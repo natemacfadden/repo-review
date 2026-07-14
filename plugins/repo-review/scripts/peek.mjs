@@ -4,10 +4,11 @@
 // renders each worker's recent activity from the HARNESS-written transcripts
 // (.../subagents/workflows/<run-id>/agent-*.jsonl). the harness appends every
 // tool call the moment it is made, so this view cannot be skipped, delayed,
-// or faked by the model - unlike the .progress files, which are narrative the
-// workers are merely instructed to write. worker identity comes from each
-// transcript's opening prompt, which the deterministic engine authored, so
-// the labels are trust-free too.
+// or faked by the model. worker identity comes from each transcript's
+// opening prompt, which the deterministic engine authored, so the labels
+// are trust-free too. this is the run's ONLY status channel by design:
+// model-written progress files were tried and removed after workers
+// skipped them or fabricated their timestamps.
 //
 // usage: node peek.mjs [run-dir] [-n <calls>]
 //   run-dir  a .../subagents/workflows/<run-id> dir; defaults to the run with
@@ -58,9 +59,12 @@ function lastActivity(run) {
 }
 
 // journal.jsonl is engine-written: "started" lines give trustworthy spawn
-// order, and any later line for the same agentId marks it finished.
+// order, and any later line for the same agentId marks it finished. the
+// `key` on a started line identifies the agent() call it serves - two
+// starts sharing a key are the engine RETRYING one call after a stall,
+// not two different workers.
 function readJournal(run) {
-  const order = []
+  const started = []
   const ended = new Map()
   let text = ''
   try { text = readFileSync(join(run, 'journal.jsonl'), 'utf8') } catch {}
@@ -69,10 +73,10 @@ function readJournal(run) {
     let e
     try { e = JSON.parse(line) } catch { continue }
     if (!e.agentId) continue
-    if (e.type === 'started') order.push(e.agentId)
+    if (e.type === 'started') started.push({ id: e.agentId, key: e.key || '' })
     else ended.set(e.agentId, e.type || 'ended')
   }
-  return { order, ended }
+  return { started, ended }
 }
 
 // pull the opening prompt and every tool call out of one agent transcript.
@@ -84,6 +88,7 @@ function readAgent(path) {
   let prompt = ''
   const calls = []
   let last = ''
+  let killed = false
   for (const line of text.split('\n')) {
     if (!line.trim()) continue
     let e
@@ -92,19 +97,22 @@ function readAgent(path) {
     const msg = e.message
     if (!msg) continue
     const content = msg.content
-    if (!prompt && msg.role === 'user') {
-      prompt = typeof content === 'string'
-        ? content
-        : (Array.isArray(content) ? content : [])
-            .filter(c => c && c.type === 'text').map(c => c.text).join('\n')
-    }
+    const bodyText = typeof content === 'string'
+      ? content
+      : (Array.isArray(content) ? content : [])
+          .filter(c => c && c.type === 'text').map(c => c.text).join('\n')
+    if (!prompt && msg.role === 'user') prompt = bodyText
+    // an interrupt (stall watchdog or a manual esc) lands as a final
+    // user-role "[Request interrupted..." message; only the LAST entry
+    // counts, so this flag is re-cleared by any later activity
+    killed = msg.role === 'user' && /\[Request interrupted/.test(bodyText)
     for (const c of Array.isArray(content) ? content : []) {
       if (c && c.type === 'tool_use') {
         calls.push({ ts: e.timestamp || '', name: c.name, input: c.input })
       }
     }
   }
-  return { prompt, calls, last }
+  return { prompt, calls, last, killed }
 }
 
 // name a worker from its engine-authored prompt (see reviewPrompt/
@@ -156,19 +164,37 @@ if (!run) {
   console.log(`run: ${run}`)
 }
 
-const { order, ended } = readJournal(run)
+const { started, ended } = readJournal(run)
+const order = started.map(s => s.id)
 const onDisk = ls(run)
   .filter(f => /^agent-.*\.jsonl$/.test(f))
   .map(f => f.replace(/^agent-|\.jsonl$/g, ''))
 // journal order first (engine truth), then any transcript the journal missed
 const ids = [...order, ...onDisk.filter(id => !order.includes(id))]
 
+// group started entries by call key to expose retries: attempt counts make
+// a stall-retry loop read as "one call, N attempts", never as N workers
+const byKey = new Map()
+for (const s of started) {
+  if (!byKey.has(s.key)) byKey.set(s.key, [])
+  byKey.get(s.key).push(s.id)
+}
+const attempt = new Map()
+for (const group of byKey.values()) {
+  if (group.length < 2) continue
+  group.forEach((id, i) => attempt.set(id, { n: i + 1, of: group.length }))
+}
+
 if (!ids.length) console.log('no agents spawned yet')
 for (let i = 0; i < ids.length; i++) {
   const id = ids[i]
   const a = readAgent(join(run, `agent-${id}.jsonl`))
-  const state = ended.has(id) ? ended.get(id) : 'RUNNING'
-  console.log(`\n[${i + 1}] ${label(a.prompt)}`)
+  const state = ended.has(id) ? ended.get(id)
+    : a.killed ? 'KILLED - "[Request interrupted]" (stall watchdog or esc)'
+    : 'RUNNING'
+  const r = attempt.get(id)
+  const tag = r ? ` - attempt ${r.n}/${r.of} of the SAME agent() call` : ''
+  console.log(`\n[${i + 1}] ${label(a.prompt)}${tag}`)
   console.log(`    ${state} - last activity ${age(a.last)} - ` +
     `${a.calls.length} tool calls`)
   for (const c of a.calls.slice(-n)) {

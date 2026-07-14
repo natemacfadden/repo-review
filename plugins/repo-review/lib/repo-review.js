@@ -18,7 +18,7 @@ export const meta = {
 // plugin version - bump on every behavior change and keep in sync with
 // .claude-plugin/plugin.json (check.sh enforces the match). printed at the
 // start of every run so logs always identify which build produced them.
-const VERSION = '0.2.6'
+const VERSION = '0.2.7'
 
 // >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
 // must use no workflow globals (agent/parallel/args/...) - pure functions only.
@@ -372,6 +372,18 @@ function findSlugCollisions(repos) {
 // outBase = outDir || OUTDIR.
 const OUTDIR = 'repo-review-out'
 
+// stall headroom for every agent() call. the engine arms an UNDOCUMENTED
+// stall watchdog per agent (opts.stallMs, default 180s in claude-code
+// 2.1.209) and kills a turn that goes that long without completing a
+// transcript event - then silently retries the same call up to 5 times.
+// a reviewer's final composition (long thinking + the big structured
+// output) routinely exceeds 180s of event silence, so the default turned
+// runs into same-lens retry loops that burned hours writing the same
+// review repeatedly (observed 2026-07-14: five performance-lens attempts,
+// each killed exactly 180s after its last tool result). 15 minutes only
+// delays recovery from a TRUE hang; it cannot slow a healthy run.
+const AGENT_STALL_MS = 900000
+
 // ---- lenses (CORE) -------------------------------------------------------
 const LENSES = [
   {
@@ -567,7 +579,6 @@ function reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date) {
   const slug = repoSlug(repo.path)
   const tmp = `/tmp/rr-${slug}-${lens.key}`
   const outPath = `${repoOutDir(outBase, slug, stamp)}/${lens.key}.md`
-  const progressPath = `${repoOutDir(outBase, slug, stamp)}/${lens.key}.progress`
   const verdicts = profile.verdicts.join(', ')
   // each lens gets a hands-on mandate scoped to its axis (deep test-authoring
   // for correctness, profiling for performance, light/read-oriented for
@@ -610,19 +621,11 @@ function reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date) {
       'memory (e.g. free -m). If memory is tight or an op risks an OOM ' +
       'kill, downgrade that step to a read-only assessment and say so - ' +
       'never risk OOM.',
-    'LIVE PROGRESS - the operator watches this run ONLY through your ' +
-      `progress file, ${progressPath} (mkdir -p its dir first). BEFORE ` +
-      'every substantive step (clone, build, each probe/test/benchmark) ' +
-      'append one line: `date "+%H:%M:%S"`, the step, and its time bound - ' +
-      'then append the outcome when it finishes. Write the line before ' +
-      'starting, not after, so a stall is attributable to a named step. ' +
-      'Never go more than a few minutes without a line; make long steps ' +
-      'log from within (per-iteration appends).',
     'TIME DISCIPLINE: every command gets an explicit, SMALL time limit - ' +
       'default 120 seconds (Bash tool timeout, or prefix `timeout 120`). ' +
       'Raising a bound must be deliberate: first prove the step at smoke ' +
-      'scale, then rerun with a higher bound and record the new bound and ' +
-      'why in the progress file. NEVER launch unbounded compute - no ' +
+      'scale, then rerun with a higher bound. NEVER launch unbounded ' +
+      'compute - no ' +
       'uncapped searches or infinite node/iteration limits; size every ' +
       'probe to finish in minutes. Long runs must stream output unbuffered ' +
       '(python3 -u / flush=True) so partial progress is visible, and a ' +
@@ -784,6 +787,7 @@ for (const repo of repos) {
     log(`${tag}: detect - classifying flavor`)
     const d = await agent(detectPrompt(repo), {
       label: `detect:${repo.path}`, phase: 'Detect', schema: DETECT_SCHEMA,
+      stallMs: AGENT_STALL_MS,
     })
     flavor = (d && d.flavor) || null
     log(`${tag}: detect done - flavor ${flavor || 'balanced'}`)
@@ -800,7 +804,7 @@ for (const repo of repos) {
       reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date),
       {
         label: `review:${repo.path}:${lens.key}`,
-        phase: 'Reviews', schema: reviewSchema,
+        phase: 'Reviews', schema: reviewSchema, stallMs: AGENT_STALL_MS,
       },
     )
     if (r) {
@@ -826,6 +830,7 @@ for (const repo of repos) {
       label: `synthesis:${repo.path}`,
       phase: 'Synthesis',
       schema: synthesisSchema,
+      stallMs: AGENT_STALL_MS,
     },
   )
   if (synthesis) {

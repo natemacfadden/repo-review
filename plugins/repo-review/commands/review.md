@@ -150,8 +150,7 @@ deliberately not a registered workflow, so `Workflow({name: "repo-review"})`
 fails with "Workflow not found"; do not try it first and fall back.
 
 Right after launching, tell the user how to watch the workers (see
-Monitoring below): the peek command verbatim, and the progress-file tail
-with the actual out dir substituted in.
+Monitoring below): the peek command verbatim.
 
 Always pass `args` as this single string - `$ARGUMENTS` forwarded unchanged
 (except for flavors/`--profile`/`--for` the user chose in the pre-launch
@@ -168,17 +167,12 @@ FACTS from the ground truth below - never speculate about what an agent is
 - **Enforced peek (primary)**: `node ${CLAUDE_PLUGIN_ROOT}/scripts/peek.mjs`
   renders every worker's recent tool calls straight from the harness-written
   transcripts. The harness appends each call the moment it is made, so this
-  view cannot be skipped, delayed, or faked by a worker - it stays truthful
-  even when a worker ignores its progress-file instruction. It shows each
+  view cannot be skipped, delayed, or faked by a worker. It shows each
   worker's lens, running/finished state, last-activity age, and recent
-  commands. Give the user this command verbatim right after launch.
-- **Live step log (narrative)**: each lens reviewer is instructed to append
-  timestamped step/bound/outcome lines to
-  `<out>/<repo>/[<stamp>/]<lens>.progress` while it works; `tail -f` it for
-  intent and declared time bounds - the one thing only the worker can state.
-  It is model-written: treat it as narrative, not ground truth. A missing or
-  stale progress file means the worker skipped its instruction, NOT that the
-  run is stuck; check the peek before concluding anything.
+  commands. Give the user this command verbatim right after launch. (There
+  is deliberately no model-written progress file: workers narrating their
+  own status proved unreliable - absent or fabricated - so the only status
+  channels are enforced ones.)
 - **Transcripts** are the raw authority the peek renders: every tool call
   and result is in
   `<project transcript dir>/<session-id>/subagents/workflows/<run-id>/agent-<id>.jsonl`,
@@ -186,9 +180,9 @@ FACTS from the ground truth below - never speculate about what an agent is
   value. Read the tail before explaining any stall - e.g. a background task
   whose output file is 0 bytes may simply be a healthy compute-bound job that
   has not flushed yet; the transcript shows what was actually launched.
-- A stalled worker is attributable by combining the two: the peek shows the
-  last command it actually launched; its progress file (if written) names
-  the step and the time bound it declared.
+- **Retry loops look like progress**: `started` entries in `journal.jsonl`
+  that share the same `key` are RETRIES of one agent() call, not new lenses.
+  Check for that before reporting how far along the run is.
 
 **Fallback** (no Workflow tool). The Workflow engine is only deterministic
 orchestration - the reviewing is agent work, so reproduce the structure with
