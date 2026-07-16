@@ -8,6 +8,7 @@
 //   REPO_REVIEW_MODEL=provider/model   (default: opencode's own default)
 import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, readFileSync, statSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
 import { run } from '../../plugins/repo-review/lib/engine.mjs'
 import {
   extractText, extractReasoning, extractUsage, extractJson, validate,
@@ -78,21 +79,22 @@ const host = {
   },
 }
 
-// Stand in for the Claude Code command: supply --out/--stamp/--date if absent,
-// and remember out base + stamp so metrics land in the review dir.
-function doorman(argstr) {
-  const iso = new Date().toISOString() // 2026-07-16T03:04:52.123Z
-  const auto = iso.replace(/[-:]/g, '').replace(/\.\d+/, '') // 20260716T030452Z
-  const date = iso.slice(0, 10) // 2026-07-16
+// Stand in for the Claude Code command: supply --out/--stamp/--date if absent.
+// Pure - given the args, the current time (ISO string), and the default out
+// base, it returns the augmented args plus the resolved out base and stamp; the
+// caller records those. Time is injected so the result is a function of inputs.
+function doorman(argstr, nowIso, defaultOutBase) {
+  const auto = nowIso.replace(/[-:]/g, '').replace(/\.\d+/, '') // 20260716T030452Z
+  const date = nowIso.slice(0, 10) // 2026-07-16
   const m = argstr.match(/--out(?:=|\s+)("[^"]*"|\S+)/)
-  if (m) outBase = m[1].replace(/^"|"$/g, '')
+  const base = m ? m[1].replace(/^"|"$/g, '') : defaultOutBase
   const sm = argstr.match(/--stamp(?:=|\s+)("[^"]*"|\S+)/)
-  runStamp = sm ? sm[1].replace(/^"|"$/g, '') : auto
+  const stamp = sm ? sm[1].replace(/^"|"$/g, '') : auto
   let a = argstr
-  if (!m) a += ` --out "${outBase}"`
-  if (!sm) a += ` --stamp ${runStamp}`
+  if (!m) a += ` --out "${base}"`
+  if (!sm) a += ` --stamp ${stamp}`
   if (!/--date(\s|=)/.test(a)) a += ` --date ${date}`
-  return a
+  return { args: a, outBase: base, stamp }
 }
 
 // filesystem-safe repo name, matching the engine's repoSlug.
@@ -161,9 +163,18 @@ function writeMetrics() {
 
 // Re-quote argv tokens with spaces so a multi-word value (e.g. --for "a b c")
 // survives being rejoined and re-tokenized by the engine.
-const rawArgs = process.argv.slice(2)
-  .map(a => (/\s/.test(a) ? JSON.stringify(a) : a))
-  .join(' ')
-const result = await run(host, doorman(rawArgs))
-writeMetrics()
-console.log('\n' + JSON.stringify(result, null, 2))
+function quoteArgs(argv) {
+  return argv.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')
+}
+
+export { doorman, quoteArgs, repoPathFromLabel, slug }
+
+// Only run a review when invoked directly (not when imported by a test).
+if (import.meta.url === pathToFileURL(process.argv[1] || '.').href) {
+  const d = doorman(quoteArgs(process.argv.slice(2)), new Date().toISOString(), outBase)
+  outBase = d.outBase
+  runStamp = d.stamp
+  const result = await run(host, d.args)
+  writeMetrics()
+  console.log('\n' + JSON.stringify(result, null, 2))
+}
