@@ -18,7 +18,7 @@ export const meta = {
 // plugin version - bump on every behavior change and keep in sync with
 // .claude-plugin/plugin.json (check.sh enforces the match). printed at the
 // start of every run so logs always identify which build produced them.
-const VERSION = '0.2.8'
+const VERSION = '0.2.9'
 
 // >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
 // must use no workflow globals (agent/parallel/args/...) - pure functions only.
@@ -432,7 +432,13 @@ const LENSES = [
       'results be reproduced from the repo as shipped? The code should also ' +
       'be readable and concise: flag long code that is not crucial to ' +
       'function or performance and recommend removing it. Note ' +
-      'contradictions (license, version/tag drift, dead code).',
+      'contradictions (license, version/tag drift, dead code). Also run a ' +
+      'light, non-authoritative security pass: flag obvious red flags that ' +
+      'surface in ordinary review - secrets or credentials committed to the ' +
+      'repo, command/SQL injection, unsafe eval or deserialization, path ' +
+      'traversal, or dependencies with known-serious CVEs. State plainly ' +
+      'that this is NOT an authoritative security audit and is not a clean ' +
+      'bill of health; keep it secondary to the maturity assessment.',
   },
   {
     key: 'taste',
@@ -461,8 +467,17 @@ const LENSES = [
       'Reward low time-to-first-success and low friction; deeper API or ' +
       'theory docs can live beyond the README. Beyond that focus, do not ' +
       'nitpick formatting or favor a particular style - judge fitness for ' +
-      'the newcomer, not adherence to a format you prefer. (Calibration of ' +
-      'claims is scored separately on the honesty axis.)',
+      'the newcomer, not adherence to a format you prefer. Also assess ' +
+      'authorial voice: does the prose read like a human who did the work, ' +
+      'or like generic AI-generated filler? Flag telltale LLM slop - hollow ' +
+      'superlatives (seamless, robust, powerful, comprehensive), formulaic ' +
+      "hedging, \"it's worth noting\", the \"not just X, but Y\" " +
+      'construction, wall-to-wall bullets and bold, and emoji-studded ' +
+      'headers that add no information. Reward concrete, specific, voice-y ' +
+      'writing. Judge the writing, not the tool: AI assistance is fine - ' +
+      'penalize only pervasive, low-information AI-slop phrasing, not ' +
+      'honest polish. (Calibration of claims is scored separately on the ' +
+      'honesty axis.)',
   },
 ]
 
@@ -492,13 +507,19 @@ const HANDS_ON = {
     'and whether headline results regenerate from the repo as shipped. A ' +
     'few targeted checks suffice; you need not author an extensive new test ' +
     'suite or profile in depth - leave those to the correctness and ' +
-    'performance lenses.',
+    'performance lenses. While you build and read, keep an eye out for ' +
+    'obvious security problems (committed secrets, injection, unsafe ' +
+    'eval/deserialization) and report any you hit - a non-exhaustive pass, ' +
+    'explicitly not a full audit.',
   documentation:
     '- FOLLOW THE README AS A COLD DROP-IN: install and run the FIRST ' +
     'documented example exactly as written, noting how fast you reach a ' +
     'working result and where you snag - that standup experience is your ' +
     'evidence. Do NOT write oracle suites, profile, or stress-test; that ' +
-    'is not your lens. Judge time-to-first-success and friction.',
+    'is not your lens. Judge time-to-first-success and friction. As you ' +
+    'read, also gauge whether the prose sounds human-authored or like ' +
+    'generic AI boilerplate, and call out the specific slop phrases you ' +
+    'find.',
   taste:
     '- USE THE INTERNET ACTIVELY: search the web for prior art, competing ' +
     'libraries, and the state of the art, and fetch pages to judge whether ' +
