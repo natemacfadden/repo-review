@@ -116,6 +116,24 @@ conda env create -f environment.yml   # runtime layer: node (only prerequisite)
 conda activate repo-review
 ```
 
+### Editing the engine
+
+The workflow is two files: **`plugins/repo-review/lib/engine.mjs`** is the
+source you edit; **`plugins/repo-review/lib/repo-review.js`** is generated from
+it by `scripts/build-cc.mjs` (the Claude Code runtime blocks `import`, so the
+shipped file must be self-contained). After editing the engine, rebuild:
+
+```
+node scripts/build-cc.mjs
+```
+
+Enable the pre-commit hook once per clone so the artifact is rebuilt and staged
+automatically on commit (CI also verifies it with `build-cc.mjs --check`):
+
+```
+git config core.hooksPath .githooks
+```
+
 No `npm install` is needed: `package.json` declares no dependencies - it only
 provides the `npm run check` / `npm test` aliases below. The checkers in
 `scripts/` and node's built-in test runner are self-contained.
