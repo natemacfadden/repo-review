@@ -80,6 +80,33 @@ plus the user's input and translates it into a proper workflow call. So it
 isn't redundant with the engine - it does the setup the sandboxed engine
 structurally cannot.
 
+## Running under opencode
+
+The reviewing logic lives in a host-agnostic engine (`lib/engine.mjs`); Claude
+Code and [opencode](https://opencode.ai) each supply a thin adapter, so there is
+one engine, not a fork. To run it under opencode from this repo:
+
+```
+npm run review -- <repo>[:flavor]... [--profile <name>] [--for "<text>"]
+```
+
+The adapter runs one headless `opencode run` session per lens (opencode drives
+the tools that clone, build, and test each repo) and writes the same output as
+the plugin - per-lens docs plus `MEMO.md` under `./repo-review-out/`.
+
+Choose the model with `REPO_REVIEW_MODEL=provider/model` (`opencode models`
+lists them); omit it for opencode's default. A local open-weights model works
+and costs nothing:
+
+```
+REPO_REVIEW_MODEL=ds4/deepseek-v4-flash npm run review -- ~/code/foo --profile job
+```
+
+**Reasoning.** When the model emits reasoning and opencode surfaces it, each
+lens's thinking is saved to `repo-review-out/reasoning/`. Some providers return
+reasoning the CLI does not forward (e.g. custom OpenAI-compatible endpoints),
+and there these files stay empty.
+
 ## Layout
 
 ```
