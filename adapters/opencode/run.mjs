@@ -75,5 +75,10 @@ function doorman(argstr) {
   return a
 }
 
-const result = await run(host, doorman(process.argv.slice(2).join(' ')))
+// Re-quote argv tokens with spaces so a multi-word value (e.g. --for "a b c")
+// survives being rejoined and re-tokenized by the engine.
+const rawArgs = process.argv.slice(2)
+  .map(a => (/\s/.test(a) ? JSON.stringify(a) : a))
+  .join(' ')
+const result = await run(host, doorman(rawArgs))
 console.log('\n' + JSON.stringify(result, null, 2))
