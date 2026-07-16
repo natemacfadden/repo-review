@@ -19,7 +19,7 @@ export const meta = {
 // plugin version - bump on every behavior change and keep in sync with
 // .claude-plugin/plugin.json (check.sh enforces the match). printed at the
 // start of every run so logs always identify which build produced them.
-const VERSION = '0.2.7'
+const VERSION = '0.2.8'
 
 // >>> pure: deterministic helpers, extracted for unit tests (test/extract.mjs).
 // must use no workflow globals (agent/parallel/args/...) - pure functions only.
@@ -433,15 +433,19 @@ const LENSES = [
   },
   {
     key: 'taste',
-    title: 'Taste & positioning',
+    title: 'Taste, positioning & the adversarial case',
     focus:
-      'Is the problem worth solving, and is the work well-positioned? Is ' +
-      'prior art and existing tooling acknowledged, and is the work honest ' +
-      'about how it compares to real alternatives? Is the chosen approach ' +
-      'the right tool for the job? Is the scope well-judged (focused and ' +
-      'finished vs. sprawling or toy)? Penalize rebuilding a solved, ' +
-      'readily-available thing with no reason to. Does it show genuine ' +
-      'judgment and domain understanding?',
+      'Two jobs. FIRST, taste and positioning: is the problem worth ' +
+      'solving, is prior art and existing tooling acknowledged, and is the ' +
+      'work honest about how it compares to real alternatives? Is the scope ' +
+      'well-judged (focused and finished vs. sprawling or toy)? Penalize ' +
+      'rebuilding a solved, readily-available thing with no reason to; ' +
+      'reward genuine judgment and domain understanding. SECOND, be the ' +
+      'skeptic: make the strongest honest case for REJECTING this artifact. ' +
+      'Assume the reader believes the README at face value, then show where ' +
+      'reality falls short - missing deliverables, overstated results, gaps ' +
+      'between the pitch and the code. Do not manufacture flaws, but do not ' +
+      'extend charity the evidence does not support.',
   },
   {
     key: 'documentation',
@@ -491,11 +495,18 @@ const HANDS_ON = {
     'evidence. Do NOT write oracle suites, profile, or stress-test; that ' +
     'is not your lens. Judge time-to-first-success and friction.',
   taste:
-    '- MOSTLY READ: assess whether the problem is worth solving, prior art ' +
-    'and honest positioning vs. real alternatives, scope, and whether the ' +
-    'approach fits. Run a quick example to ground your read, but do NOT ' +
-    'author test suites or profile - spend your effort on the positioning ' +
-    'call, not on re-verifying correctness or performance.',
+    '- USE THE INTERNET ACTIVELY: search the web for prior art, competing ' +
+    'libraries, and the state of the art, and fetch pages to judge whether ' +
+    'this work is novel or a redundant reimplementation; check the claims ' +
+    'and citations against real sources. If web tools are unavailable, do ' +
+    'NOT penalize the repo for unverified prior art or claims (that is a ' +
+    'limit of THIS review, not a repo fault); record it in caveats and ' +
+    'reason from what you know.\n' +
+    '- BUILD THE REJECTION CASE: read the README and code and run a quick ' +
+    'example to ground the read, then assemble the strongest honest ' +
+    'argument against the artifact - claims vs. reality, scope, prior art. ' +
+    'Do NOT author test suites or profile; leave that to the correctness ' +
+    'and performance lenses.',
 }
 
 // SCHEMAS
@@ -532,6 +543,11 @@ function buildReviewSchema(profile) {
       reviewPath: { type: 'string', description: 'path of the written review' },
       summary: { type: 'string', description: 'one-line summary' },
       cleanupConfirmed: { type: 'boolean' },
+      caveats: {
+        type: 'array', items: { type: 'string' },
+        description: 'limits of THIS review (e.g. web tools unavailable) - ' +
+          'NOT repo faults; never lower a score for these',
+      },
     },
   }
 }
@@ -658,7 +674,9 @@ function reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date) {
       'system-wide; leave no trace. Confirm cleanup.',
     `In your structured output, set reviewPath to ${outPath} and give a ` +
       'ONE-LINE summary; populate scores, recommendation, and the other ' +
-      'fields. Do NOT return the full review text in the output - it lives ' +
+      'fields. If any tool you needed (e.g. web search) was unavailable, ' +
+      'list it in caveats and do NOT lower any score for your own missing ' +
+      'tools. Do NOT return the full review text in the output - it lives ' +
       'in the doc you wrote.',
   ].filter(Boolean).join('\n\n')
 }
@@ -675,6 +693,7 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp,
     oversellAssessment: r.oversellAssessment,
     testsWritten: r.testsWritten,
     reviewedCommit: r.reviewedCommit,
+    caveats: r.caveats,
   }))
   return [
     `You are the synthesizing chair consolidating ${reviews.length} ` +
@@ -714,11 +733,16 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp,
       'independently flagged, or that are clearly material.\n' +
       '- OVERSELL/UNDERSELL: an explicit calibration call (drawing on the ' +
       'honesty axis and the oversell assessments).\n' +
+      '- CAVEATS (loud): if any reviewer reported caveats (e.g. web tools ' +
+      'unavailable), state them prominently as limits of the REVIEW, never ' +
+      'as repo faults, and do not let them lower the scores or verdict.\n' +
       '- FIXES: a prioritized, actionable punch-list; tag each with impact ' +
       `(what ${profile.audience} sees) and effort (minutes / hours / >1 ` +
       'day).',
     `WRITE THE MEMO DOC: save the full markdown memo to ${memoPath}, ` +
-      'opening with the provenance line (per the rules above), then: a ' +
+      'opening with a LOUD "> Review limitations" callout if any reviewer ' +
+      'reported caveats (e.g. web tools unavailable), then the provenance ' +
+      'line (per the rules above), then: a ' +
       'one-paragraph verdict; a per-axis reconciled-score table with ranges; ' +
       'consensus strengths; consensus weaknesses/red flags; outliers; ' +
       'disagreements; the oversell/undersell call; the Fixes section; and ' +
