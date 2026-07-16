@@ -9,6 +9,20 @@ synthesizes a scored review. Two overlays tune the review: a **profile** (who is
 judging and how to grade; default a general code-quality review) and a
 **flavor** (what the repo is for, e.g. high-performance vs. personal).
 
+## Quickstart
+
+In a Claude Code session (not a shell):
+
+```
+/plugin marketplace add natemacfadden/repo-review
+/plugin install repo-review@repo-review
+/reload-plugins
+/repo-review:review ./path/to/repo        # --help lists every option
+```
+
+Prefer the terminal? See [opencode](#opencode-terminal) below. Everything past
+here is detail - profiles, flavors, architecture.
+
 ## How the review is shaped
 
 - **Lenses** - the same five every run, each a separate reviewer working in
@@ -213,6 +227,9 @@ session without a restart. Nothing here touches the source repo - plugin state
 lives only in `~/.claude/`.
 
 ## Run (quick reference)
+
+Kept at the very bottom on purpose - it's what stays on screen after
+`cat README.md`. (Reading top-down on the web? See [Quickstart](#quickstart).)
 
 ```
 # Claude Code - in a session (see Running > Claude Code)
