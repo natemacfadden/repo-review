@@ -6,6 +6,7 @@
   "description": "Dev/CI tooling for the repo-review Claude Code plugin",
   "scripts": {
     "check": "bash scripts/check.sh",
-    "test": "node --test"
+    "test": "node --test",
+    "review": "node adapters/opencode/run.mjs"
   }
 }
