@@ -29,9 +29,16 @@ So `./ui:performance --profile job --for "a Research Engineer role"` reviews
 `./ui` as a high-performance codebase, judged by a hiring committee, for an RE
 role - same five lenses, three different dials on top.
 
-## Install
+## Running
 
-Run these as slash commands inside a Claude Code session (not a shell):
+Two ways to run the same review - same arguments, same output under
+`repo-review-out/<repo>/<stamp>/` (one doc per lens plus `MEMO.md`). The
+reviewing logic is one host-agnostic engine (`lib/engine.mjs`); Claude Code and
+[opencode](https://opencode.ai) each supply a thin adapter, so there is no fork.
+
+### Claude Code (plugin)
+
+Install once, as slash commands inside a session (not a shell):
 
 ```
 /plugin marketplace add natemacfadden/repo-review
@@ -39,23 +46,42 @@ Run these as slash commands inside a Claude Code session (not a shell):
 /reload-plugins
 ```
 
-`/reload-plugins` activates it in the current session without a restart. Then:
+Then run - `--help` lists every option (profiles, flavors, `--for`, `--out`):
 
 ```
-/repo-review:review <repo-path>[:flavor]...
-```
-
-For the full options reference - profiles, flavors, `--for`, `--out` - run:
-
-```
+/repo-review:review <repo>[:flavor]... [--profile <name>] [--for "<text>"]
 /repo-review:review --help
 ```
 
-(The command is `/repo-review:review`: Claude Code namespaces plugin commands
-as `/<plugin>:<command>`.)
+To watch the lens workers, run the peek command the review prints at launch, or
+use `/workflows`.
 
-Updating and uninstalling are at the [end of this README](#update) - kept
-last so `cat README.md` leaves the update steps on screen.
+### opencode (terminal)
+
+From a clone of this repo. Choose any model opencode knows with
+`REPO_REVIEW_MODEL=provider/model` (`opencode models`; omit for the default) - a
+local open-weights model works and costs nothing:
+
+```
+REPO_REVIEW_MODEL=ds4/deepseek-v4-flash \
+  npm run review -- <repo>[:flavor]... [--profile <name>] [--for "<text>"]
+```
+
+The adapter runs one headless `opencode run` session per lens and logs each
+phase to stdout, so redirect and tail to watch live:
+
+```
+REPO_REVIEW_MODEL=ds4/deepseek-v4-flash npm run review -- ~/code/foo >run.log 2>&1 &
+tail -f run.log
+```
+
+When the model emits reasoning and opencode surfaces it, each lens's thinking is
+saved to `repo-review-out/reasoning/`. (Some providers - e.g. custom
+OpenAI-compatible endpoints - return reasoning the CLI drops, so those files
+stay empty.)
+
+Updating and uninstalling the plugin are at the [end of this README](#update) -
+kept last so `cat README.md` leaves the update steps on screen.
 
 ## Architecture
 
@@ -79,33 +105,6 @@ a CLI. The command is the thin, agent-driven adapter that gathers that context
 plus the user's input and translates it into a proper workflow call. So it
 isn't redundant with the engine - it does the setup the sandboxed engine
 structurally cannot.
-
-## Running under opencode
-
-The reviewing logic lives in a host-agnostic engine (`lib/engine.mjs`); Claude
-Code and [opencode](https://opencode.ai) each supply a thin adapter, so there is
-one engine, not a fork. To run it under opencode from this repo:
-
-```
-npm run review -- <repo>[:flavor]... [--profile <name>] [--for "<text>"]
-```
-
-The adapter runs one headless `opencode run` session per lens (opencode drives
-the tools that clone, build, and test each repo) and writes the same output as
-the plugin - per-lens docs plus `MEMO.md` under `./repo-review-out/`.
-
-Choose the model with `REPO_REVIEW_MODEL=provider/model` (`opencode models`
-lists them); omit it for opencode's default. A local open-weights model works
-and costs nothing:
-
-```
-REPO_REVIEW_MODEL=ds4/deepseek-v4-flash npm run review -- ~/code/foo --profile job
-```
-
-**Reasoning.** When the model emits reasoning and opencode surfaces it, each
-lens's thinking is saved to `repo-review-out/reasoning/`. Some providers return
-reasoning the CLI does not forward (e.g. custom OpenAI-compatible endpoints),
-and there these files stay empty.
 
 ## Layout
 
