@@ -23,6 +23,36 @@ export const extractText = (jsonl) => partsOfType(jsonl, 'text').join('')
 export const extractReasoning = (jsonl) =>
   partsOfType(jsonl, 'reasoning').join('\n')
 
+// Sum token usage and cost across the stream's step-finish events.
+export function extractUsage(jsonl) {
+  const u = {
+    input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0,
+    total: 0, cost: 0,
+  }
+  for (const line of String(jsonl || '').split('\n')) {
+    if (!line.trim()) continue
+    let ev
+    try {
+      ev = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const p = ev && ev.part
+    if (!p || p.type !== 'step-finish') continue
+    const t = p.tokens || {}
+    u.input += t.input || 0
+    u.output += t.output || 0
+    u.reasoning += t.reasoning || 0
+    u.total += t.total || 0
+    if (t.cache) {
+      u.cacheRead += t.cache.read || 0
+      u.cacheWrite += t.cache.write || 0
+    }
+    u.cost += p.cost || 0
+  }
+  return u
+}
+
 // The last valid ```json fence, else the last {...} span, else null.
 export function extractJson(text) {
   const s = String(text || '')

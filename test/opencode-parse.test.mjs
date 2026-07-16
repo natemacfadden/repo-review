@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  extractText, extractReasoning, extractJson, validate, schemaInstruction,
+  extractText, extractReasoning, extractUsage, extractJson, validate,
+  schemaInstruction,
 } from '../adapters/opencode/parse.mjs'
 
 // a representative `opencode run --format json` stream (JSONL)
@@ -25,6 +26,20 @@ test('extractText: concatenates text parts in order, ignores non-text/non-json',
 test('extractReasoning: collects reasoning parts; text excludes them', () => {
   assert.equal(extractReasoning(STREAM), 'Let me think.')
   assert.doesNotMatch(extractText(STREAM), /Let me think/)
+})
+
+test('extractUsage: sums tokens and cost across step-finish events', () => {
+  const s = [
+    '{"part":{"type":"step-finish","tokens":{"total":10,"input":8,' +
+      '"output":2},"cost":0.01}}',
+    '{"part":{"type":"step-finish","tokens":{"total":5,"input":4,"output":1,' +
+      '"cache":{"read":3,"write":1}},"cost":0.02}}',
+  ].join('\n')
+  const u = extractUsage(s)
+  assert.equal(u.total, 15)
+  assert.equal(u.input, 12)
+  assert.equal(u.cacheRead, 3)
+  assert.equal(Math.round(u.cost * 100), 3)
 })
 
 test('extractJson: pulls the fenced json block', () => {
