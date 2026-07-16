@@ -48,6 +48,9 @@ test('findSlugCollisions: none when unique; safe on empty/garbage', () => {
   assert.deepEqual(findSlugCollisions([{ path: './a' }, { path: './b' }]), [])
   assert.deepEqual(findSlugCollisions([]), [])
   assert.deepEqual(findSlugCollisions(null), [])
+  // path-less entries are garbage, not a collision (they must not bucket
+  // together under repoSlug's 'repo' fallback)
+  assert.deepEqual(findSlugCollisions([{ path: null }, { path: undefined }, {}]), [])
 })
 
 test('splitRepoToken: bare path -> no flavor', () => {

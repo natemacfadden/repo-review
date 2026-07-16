@@ -355,9 +355,11 @@ function repoOutDir(outBase, slug, stamp) {
 function findSlugCollisions(repos) {
   const bySlug = new Map()
   for (const r of Array.isArray(repos) ? repos : []) {
-    const slug = repoSlug(r && r.path)
+    const path = r && r.path
+    if (!path) continue           // no path -> nothing to collide; skip garbage
+    const slug = repoSlug(path)
     if (!bySlug.has(slug)) bySlug.set(slug, [])
-    bySlug.get(slug).push(r && r.path)
+    bySlug.get(slug).push(path)
   }
   const collisions = []
   for (const [slug, paths] of bySlug) {
