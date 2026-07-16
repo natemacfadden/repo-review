@@ -80,8 +80,8 @@ saved to `repo-review-out/reasoning/`. (Some providers - e.g. custom
 OpenAI-compatible endpoints - return reasoning the CLI drops, so those files
 stay empty.)
 
-Updating and uninstalling the plugin are at the [end of this README](#update) -
-kept last so `cat README.md` leaves the update steps on screen.
+A one-line run cheatsheet plus the update/uninstall steps sit at the [end of
+this README](#run-quick-reference), so `cat README.md` leaves them on screen.
 
 ## Architecture
 
@@ -211,6 +211,16 @@ Removing the marketplace also uninstalls any plugin installed from it, so the
 first line is optional. `/reload-plugins` applies the removal to the current
 session without a restart. Nothing here touches the source repo - plugin state
 lives only in `~/.claude/`.
+
+## Run (quick reference)
+
+```
+# Claude Code - in a session (see Running > Claude Code)
+/repo-review:review <repo>[:flavor]... [--profile <name>] [--for "<text>"]
+
+# opencode - in a terminal from a clone (see Running > opencode)
+REPO_REVIEW_MODEL=<provider/model> npm run review -- <repo>[:flavor]...
+```
 
 ## License
 
