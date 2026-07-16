@@ -390,18 +390,22 @@ const AGENT_STALL_MS = 900000
 const LENSES = [
   {
     key: 'performance',
-    title: 'Performance & benchmarking rigor',
+    title: 'Performance & efficiency',
     focus:
-      'Is the work efficient for what it does? Actually profile the code ' +
-      'yourself (e.g. cProfile or pprofile for Python, or a profiler ' +
-      'appropriate to the stack) to locate hot spots - do not just trust ' +
-      'claims. Scrutinize benchmarking methodology: warmup, repeated ' +
-      'trials, variance/error bars, fixed and reported hardware, fair ' +
-      'baselines. Are performance claims backed by evidence or merely ' +
-      'asserted? Is there a credible baseline (naive impl or an established ' +
-      'library)? Does it scale (problem size, threads/cores, GPU if ' +
-      'claimed)? Where feasible, reproduce a headline number and report ' +
-      'what you measured.',
+      'Is the work efficient for what it does - judged on the terms that ' +
+      'matter for THIS repo, not one fixed checklist. First decide what ' +
+      'performance means here and measure that: run time, memory, and ' +
+      'scaling for compute or numeric code; throughput and latency for a ' +
+      'service; startup and I/O for a CLI; time, memory, and (where ' +
+      'applicable) token/API cost for a tool that drives external work. ' +
+      'Profile it yourself with a tool fit for the stack to find where ' +
+      'time and resources actually go - do not just trust claims. Hold it ' +
+      'to rigorous benchmarking (warmup, repeated trials, variance/error ' +
+      'bars, fixed reported hardware, fair baselines) where speed or ' +
+      'efficiency is a headline claim; where it is not, judge whether the ' +
+      'work is reasonably efficient for its purpose rather than demanding ' +
+      'a benchmark harness it never needed. Back any efficiency claim with ' +
+      'a credible baseline and reproduce a headline number where feasible.',
   },
   {
     key: 'correctness',
@@ -475,12 +479,14 @@ const HANDS_ON = {
     'confirm or break the headline outputs. Go well beyond the shipped ' +
     'suite; report what you wrote and what it showed.',
   performance:
-    '- PROFILE the code yourself (cProfile/pprofile for Python, or a ' +
-    'profiler appropriate to the stack) to find where time actually goes, ' +
-    'reproduce the headline performance numbers, and scrutinize the ' +
-    'benchmark methodology (warmup, repeats, error bars, fixed/reported ' +
-    'hardware, fair baselines). Write small perf probes where they sharpen ' +
-    'the picture; do not author a broad correctness suite.',
+    '- PROFILE with a tool fit for the stack (cProfile/pprofile, a tracer, ' +
+    'timers, or resource/token accounting where relevant) to see where ' +
+    'time and resources actually go, and judge efficiency on what matters ' +
+    'for THIS repo rather than one fixed metric. Scrutinize benchmark ' +
+    'methodology (warmup, repeats, error bars, fixed hardware, fair ' +
+    'baselines) where speed or efficiency is a headline claim; otherwise ' +
+    'assess fitness-for-purpose. Write small perf probes where they ' +
+    'sharpen the picture; do not author a broad correctness suite.',
   engineering:
     '- BUILD AND INSTALL FROM SCRATCH (record friction), run the shipped ' +
     'tests and any CI locally, and check reproducibility - seeds, configs, ' +
