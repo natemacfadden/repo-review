@@ -1,4 +1,3 @@
-// Generated from engine.mjs by scripts/build-cc.mjs - edit engine.mjs.
 // repo-review - clone + build + run a repo, review across five lenses, synthesize
 //
 // design: CORE lenses + clone/build/run, with a swappable PROFILE overlay
@@ -738,7 +737,7 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp,
 // one at a time within each. Only one clone/build/run is ever active, so
 // profiling/benchmarks are uncontended and RAM stays bounded.
 // advertise the argument contract before anything else can fail on it
-async function run(host, args) {
+export async function run(host, args) {
 host.log(USAGE)
 const { repos, profile: profileName, specialization, outDir, stamp, date,
   warnings } = normalizeArgs(args)
@@ -863,10 +862,3 @@ for (const res of results) {
 
 return { profile: profile.name, repos: results }
 }
-
-// Claude Code launcher: wire the runtime globals into the injected host.
-const __host = {
-  spawn: (prompt, opts) => agent(prompt, opts),
-  log,
-}
-return run(__host, args)

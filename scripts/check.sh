@@ -56,6 +56,14 @@ else
   skip "workflow syntax (node not found - activate the conda env)"
 fi
 
+# 4b. generated artifact is in sync with its source (engine.mjs -> repo-review.js)
+section "build-cc sync"
+if command -v node >/dev/null 2>&1; then
+  if node scripts/build-cc.mjs --check; then ok "build-cc sync"; else bad "build-cc sync"; fi
+else
+  skip "build-cc sync (node not found - activate the conda env)"
+fi
+
 # 5. workflow meta validity (required fields, pure literal, phase() matching)
 section "meta"
 if command -v node >/dev/null 2>&1; then
