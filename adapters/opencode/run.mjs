@@ -60,7 +60,15 @@ const host = {
     }
     let result = null
     for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-      const raw = await opencodeRun(full)
+      let raw
+      try {
+        raw = await opencodeRun(full)
+      } catch (e) {
+        // hard opencode error - fail this lens (spawn returns null), don't retry
+        console.log(`  ${opts && opts.label} - opencode error, failing lens: ` +
+          `${String((e && e.message) || e).slice(-140)}`)
+        break
+      }
       const u = extractUsage(raw)
       for (const k of Object.keys(usage)) usage[k] += u[k]
       saveReasoning(opts && opts.label, extractReasoning(raw))
