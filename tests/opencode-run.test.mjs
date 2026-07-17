@@ -1,8 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  doorman, quoteArgs, repoPathFromLabel,
+  doorman, quoteArgs, repoPathFromLabel, saveRaw,
 } from '../adapters/opencode/run.mjs'
+import {
+  mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 // importing run.mjs is side-effect-free: its bottom-of-file execution is
 // behind a "run only when invoked directly" guard, so these helpers can be
@@ -66,4 +71,35 @@ test('repoPathFromLabel: non-review labels keep all after the prefix', () => {
 test('repoPathFromLabel: paths containing colons are rejoined', () => {
   assert.equal(repoPathFromLabel('review:C:/repos/foo:taste'), 'C:/repos/foo')
   assert.equal(repoPathFromLabel('detect:C:/repos/foo'), 'C:/repos/foo')
+})
+
+// saveRaw
+// -------
+
+test('saveRaw: keeps raw only for a unit whose doc is missing/empty', () => {
+  const b = mkdtempSync(join(tmpdir(), 'rr-raw-test-'))
+  const rawDir = join(b, 'scratch')
+  mkdirSync(rawDir, { recursive: true })
+  const outDir = join(b, 'out', 'repo', 'STAMP')
+  mkdirSync(outDir, { recursive: true })
+  // both units spilled a raw stream
+  writeFileSync(join(rawDir, 'review_r_engineering.raw.jsonl'), 'RAW-ENG')
+  writeFileSync(join(rawDir, 'review_r_performance.raw.jsonl'), 'RAW-PERF')
+  // engineering wrote a real doc; performance's doc got nuked (missing)
+  writeFileSync(join(outDir, 'engineering.md'), 'x'.repeat(500))
+  const docs = new Map([
+    ['review:/r:engineering', join(outDir, 'engineering.md')],
+    ['review:/r:performance', join(outDir, 'performance.md')],
+  ])
+
+  assert.equal(saveRaw(docs, rawDir, false), 1)
+  assert.equal(existsSync(join(outDir, 'performance.raw.jsonl')), true) // saved
+  assert.equal(existsSync(join(outDir, 'engineering.raw.jsonl')), false) // skipped
+  assert.equal(readFileSync(join(outDir, 'performance.raw.jsonl'), 'utf8'),
+    'RAW-PERF')
+
+  // keepAll promotes the healthy one too
+  saveRaw(docs, rawDir, true)
+  assert.equal(existsSync(join(outDir, 'engineering.raw.jsonl')), true)
+  rmSync(b, { recursive: true, force: true })
 })

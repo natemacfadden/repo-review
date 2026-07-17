@@ -7,8 +7,13 @@
 //   node adapters/opencode/run.mjs <repo>[:flavor]... [--profile ..] [--for ..]
 //   REPO_REVIEW_MODEL=provider/model   (default: opencode's own default)
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdirSync, writeFileSync, readFileSync, statSync } from 'node:fs'
+import {
+  mkdirSync, writeFileSync, readFileSync, statSync,
+  existsSync, copyFileSync, rmSync,
+} from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { run } from '../../src/engine.mjs'
 import { repoSlug } from '../../src/util.mjs'
 import {
@@ -21,6 +26,13 @@ const MAX_TRIES = Number(process.env.REPO_REVIEW_TRIES || 3)
 let outBase = `${process.cwd()}/repo-review-out`
 let runStamp = null
 const metrics = []
+// raw stream fallback: each spawn's raw is spilled to scratch (off outBase,
+// out of the model's reach); a unit's raw is promoted into the archive only
+// if its doc came out missing/empty. REVIEW_KEEP_RAW=1 keeps every stream
+const KEEP_RAW = process.env.REVIEW_KEEP_RAW === '1'
+let rawDir = null
+const docPaths = new Map()   // label -> the doc path the unit declared
+const safeName = (s) => String(s || 'spawn').replace(/[^\w.-]+/g, '_')
 
 function opencodeRun(prompt) {
   return new Promise((resolve, reject) => {
@@ -44,7 +56,7 @@ function saveReasoning(label, text) {
   if (!text) return
   const dir = `${outBase}/reasoning`
   mkdirSync(dir, { recursive: true })
-  const file = `${dir}/${String(label || 'spawn').replace(/[^\w.-]+/g, '_')}.md`
+  const file = `${dir}/${safeName(label)}.md`
   writeFileSync(file, text)
   console.log(`  reasoning -> ${file}`)
 }
@@ -70,13 +82,19 @@ const host = {
           `${String((e && e.message) || e).slice(-140)}`)
         break
       }
+      spillRaw(opts && opts.label, raw)
       const u = extractUsage(raw)
       for (const k of Object.keys(usage)) usage[k] += u[k]
       saveReasoning(opts && opts.label, extractReasoning(raw))
       const text = extractText(raw)
       if (!schema) { result = text; break }
       const obj = extractJson(text)
-      if (validate(obj, schema)) { result = obj; break }
+      if (validate(obj, schema)) {
+        const dp = obj.reviewPath || obj.memoPath
+        if (dp) docPaths.set(opts && opts.label, dp)
+        result = obj
+        break
+      }
       console.log(`  retry ${attempt}/${MAX_TRIES}: ${opts.label} - no valid JSON`)
     }
     metrics.push({
@@ -167,20 +185,62 @@ function writeMetrics() {
   }
 }
 
+// spill one spawn's raw stream to scratch so we can keep it if the doc fails.
+// on disk, not in memory - holding every stream would risk the mem watchdog
+function spillRaw(label, raw) {
+  if (!rawDir) return
+  try {
+    mkdirSync(rawDir, { recursive: true })
+    writeFileSync(join(rawDir, safeName(label) + '.raw.jsonl'), raw)
+  } catch { /* best effort - the review still returns */ }
+}
+
+// the runner's fallback: for each unit whose doc is missing/empty, promote its
+// raw stream into the archive as the best output we have. turning a stream back
+// into a clean doc is a separate offline tool (resurrect.mjs), never the
+// runner's job. keepAll promotes every declared unit (REVIEW_KEEP_RAW)
+function saveRaw(docs, dir, keepAll) {
+  const MIN_DOC = 200  // a real review doc is always larger than this
+  let saved = 0
+  for (const [label, docPath] of docs) {
+    const spill = join(dir, safeName(label) + '.raw.jsonl')
+    if (!existsSync(spill)) continue
+    let ok = false
+    try { ok = statSync(docPath).size >= MIN_DOC } catch { ok = false }
+    if (ok && !keepAll) continue
+    const dest = docPath.replace(/\.md$/, '') + '.raw.jsonl'
+    try {
+      mkdirSync(dirname(dest), { recursive: true })
+      copyFileSync(spill, dest)
+      saved++
+      console.log(ok
+        ? `  keeping raw (REVIEW_KEEP_RAW) -> ${dest}`
+        : `  doc missing/empty for ${label} - saved raw -> ${dest}`)
+    } catch (e) {
+      console.log(`  could not save raw for ${label}: ${e.message}`)
+    }
+  }
+  if (saved) console.log(`saved ${saved} raw stream(s) as fallback records`)
+  return saved
+}
+
 // re-quote argv tokens with spaces so a multi-word value (e.g. --for "a b c")
 // survives being rejoined and re-tokenized by the engine.
 function quoteArgs(argv) {
   return argv.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')
 }
 
-export { doorman, quoteArgs, repoPathFromLabel }
+export { doorman, quoteArgs, repoPathFromLabel, saveRaw }
 
 // only run a review when invoked directly (not when imported by a test).
 if (import.meta.url === pathToFileURL(process.argv[1] || '.').href) {
   const d = doorman(quoteArgs(process.argv.slice(2)), new Date().toISOString(), outBase)
   outBase = d.outBase
   runStamp = d.stamp
+  rawDir = join(tmpdir(), `rr-raw-${runStamp}`)
   const result = await run(host, d.args)
+  saveRaw(docPaths, rawDir, KEEP_RAW)
+  rmSync(rawDir, { recursive: true, force: true })
   writeMetrics()
   console.log('\n' + JSON.stringify(result, null, 2))
 }
