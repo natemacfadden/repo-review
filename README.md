@@ -47,7 +47,7 @@ role - same five lenses, three different dials on top.
 
 Two ways to run the same review - same arguments, same output under
 `repo-review-out/<repo>/<stamp>/` (one doc per lens plus `MEMO.md`). The
-reviewing logic is one host-agnostic engine (`lib/engine.mjs`); Claude Code and
+reviewing logic is one host-agnostic engine (in `src/`); Claude Code and
 [opencode](https://opencode.ai) each supply a thin adapter, so there is no fork.
 
 ### Claude Code (plugin)
@@ -158,10 +158,11 @@ conda activate repo-review
 
 ### Editing the engine
 
-The workflow is two files: **`plugins/repo-review/lib/engine.mjs`** is the
-source you edit; **`plugins/repo-review/lib/repo-review.js`** is generated from
-it by `scripts/build-cc.mjs` (the Claude Code runtime blocks `import`, so the
-shipped file must be self-contained). After editing the engine, rebuild:
+You edit the modules in **`src/`** - `engine.mjs` (parsing, reconciliation,
+orchestration), `content.mjs` (prompts + tuning tables), and `util.mjs` (pure
+helpers). **`plugins/repo-review/lib/repo-review.js`** is generated from them by
+`scripts/build-cc.mjs` (the Claude Code runtime blocks `import`, so the shipped
+file must be self-contained). After editing, rebuild:
 
 ```
 node scripts/build-cc.mjs

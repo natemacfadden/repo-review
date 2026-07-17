@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { describeFlavor } from '../plugins/repo-review/lib/content.mjs'
-import { KNOWN_FLAVORS } from '../plugins/repo-review/lib/engine.mjs'
+import { describeFlavor } from '../src/content.mjs'
+import { KNOWN_FLAVORS } from '../src/engine.mjs'
 
 test('describeFlavor: every known flavor has its own distinct guidance', () => {
   const balanced = describeFlavor(null)

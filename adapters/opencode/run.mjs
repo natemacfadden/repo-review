@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // opencode host for the repo-review engine. Same engine as Claude Code
-// (lib/engine.mjs); only the host differs. host.spawn runs a headless
+// (src/engine.mjs); only the host differs. host.spawn runs a headless
 // `opencode run` session per lens and validates its JSON; host.log prints to
 // stdout; reasoning is saved per session when the model emits it.
 //
@@ -9,7 +9,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, readFileSync, statSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { run } from '../../plugins/repo-review/lib/engine.mjs'
+import { run } from '../../src/engine.mjs'
 import {
   extractText, extractReasoning, extractUsage, extractJson, validate,
   schemaInstruction,

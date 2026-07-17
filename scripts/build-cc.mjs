@@ -10,9 +10,10 @@
 //        node scripts/build-cc.mjs --check   # verify it is up to date (CI)
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const ROOT = new URL('../plugins/repo-review/lib/', import.meta.url)
+const SRC = new URL('../src/', import.meta.url)
 const MODULES = ['util.mjs', 'content.mjs', 'engine.mjs'] // dependency order
-const ARTIFACT = new URL('repo-review.js', ROOT)
+const ARTIFACT =
+  new URL('../plugins/repo-review/lib/repo-review.js', import.meta.url)
 
 const BANNER =
   '// generated from util/content/engine.mjs by scripts/build-cc.mjs\n' +
@@ -37,7 +38,7 @@ function strip(src) {
 
 function build() {
   const parts = MODULES.map(
-    name => strip(readFileSync(new URL(name, ROOT), 'utf8')).trimEnd(),
+    name => strip(readFileSync(new URL(name, SRC), 'utf8')).trimEnd(),
   )
   return BANNER + parts.join('\n\n') + '\n' + LAUNCHER
 }

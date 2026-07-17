@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { reconcileScores } from '../plugins/repo-review/lib/engine.mjs'
+import { reconcileScores } from '../src/engine.mjs'
 
 const reviews = [
   {

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { run } from '../plugins/repo-review/lib/engine.mjs'
+import { run } from '../src/engine.mjs'
 
 // A fake host records every spawn and returns canned structured output, so the
 // entire orchestration recipe (detect -> five lenses -> reconcile -> synth) is

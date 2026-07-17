@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { run } from '../plugins/repo-review/lib/engine.mjs'
-import { resolveProfile } from '../plugins/repo-review/lib/engine.mjs'
-import { describeFlavor } from '../plugins/repo-review/lib/content.mjs'
-import { repoSlug, repoOutDir } from '../plugins/repo-review/lib/util.mjs'
+import { run } from '../src/engine.mjs'
+import { resolveProfile } from '../src/engine.mjs'
+import { describeFlavor } from '../src/content.mjs'
+import { repoSlug, repoOutDir } from '../src/util.mjs'
 
 // We drive run() with a fake host that records each prompt (no model calls),
 // and compute what each prompt SHOULD contain from the same helpers the engine
