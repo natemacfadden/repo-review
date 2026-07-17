@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # keep the generated CC artifact (lib/repo-review.js) in sync with its source
 # (src/*.mjs) at commit time, so a forgotten rebuild can't commit drift
-# CI re-verifies with `scripts/build-cc.mjs --check`; this is the local guard.
+# CI re-verifies with `adapters/claude/build.mjs --check`; this is the local guard.
 #
 # Enable once per clone:  git config core.hooksPath .githooks
 set -uo pipefail
@@ -21,7 +21,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 artifact=plugins/repo-review/lib/repo-review.js
-node scripts/build-cc.mjs >/dev/null
+node adapters/claude/build.mjs >/dev/null
 if ! git diff --quiet -- "$artifact"; then
   git add -- "$artifact"
   echo "pre-commit: regenerated $artifact from src/ and staged it." >&2

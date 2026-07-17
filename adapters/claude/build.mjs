@@ -6,17 +6,17 @@
 // wiring agent/log into the host. the .mjs files are the source of truth;
 // repo-review.js is generated - do not hand-edit
 //
-// usage: node scripts/build-cc.mjs          # write the artifact
-//        node scripts/build-cc.mjs --check   # verify it is up to date (CI)
+// usage: node adapters/claude/build.mjs          # write the artifact
+//        node adapters/claude/build.mjs --check   # verify it is up to date (CI)
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const SRC = new URL('../src/', import.meta.url)
+const SRC = new URL('../../src/', import.meta.url)
 const MODULES = ['util.mjs', 'content.mjs', 'engine.mjs'] // dependency order
 const ARTIFACT =
-  new URL('../plugins/repo-review/lib/repo-review.js', import.meta.url)
+  new URL('../../plugins/repo-review/lib/repo-review.js', import.meta.url)
 
 const BANNER =
-  '// generated from util/content/engine.mjs by scripts/build-cc.mjs\n' +
+  '// generated from util/content/engine.mjs by adapters/claude/build.mjs\n' +
   '// do not edit by hand - edit the .mjs sources\n'
 
 const LAUNCHER =
@@ -54,12 +54,12 @@ if (process.argv.includes('--check')) {
   }
   if (current !== generated) {
     console.error(
-      'build-cc: repo-review.js is stale - run `node scripts/build-cc.mjs`',
+      'build: repo-review.js is stale - run `node adapters/claude/build.mjs`',
     )
     process.exit(1)
   }
-  console.log('build-cc: artifact up to date')
+  console.log('build: artifact up to date')
 } else {
   writeFileSync(ARTIFACT, generated)
-  console.log('build-cc: wrote repo-review.js')
+  console.log('build: wrote repo-review.js')
 }

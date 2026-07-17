@@ -1,4 +1,4 @@
-// generated from util/content/engine.mjs by scripts/build-cc.mjs
+// generated from util/content/engine.mjs by adapters/claude/build.mjs
 // do not edit by hand - edit the .mjs sources
 // pure path helpers shared by the engine and prompt builders. no deps, no
 // side effects - safe to import anywhere
@@ -447,7 +447,7 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp,
 // repo-review engine: argument parsing, profile resolution, score
 // reconciliation, schema building, and the sequential orchestration loop. the
 // prompt text and tuning tables live in content.mjs, pure helpers in util.mjs.
-// scripts/build-cc.mjs inlines all three into the repo-review.js artifact
+// adapters/claude/build.mjs inlines all three into the repo-review.js artifact
 
 export const meta = {
   name: 'repo-review',

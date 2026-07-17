@@ -56,12 +56,13 @@ else
   skip "workflow syntax (node not found - activate the conda env)"
 fi
 
-# 4b. generated artifact is in sync with its source (engine.mjs -> repo-review.js)
-section "build-cc sync"
+# 4b. generated artifact is in sync with its source (src/*.mjs -> repo-review.js)
+section "artifact sync"
 if command -v node >/dev/null 2>&1; then
-  if node scripts/build-cc.mjs --check; then ok "build-cc sync"; else bad "build-cc sync"; fi
+  if node adapters/claude/build.mjs --check; then ok "artifact sync"
+  else bad "artifact sync"; fi
 else
-  skip "build-cc sync (node not found - activate the conda env)"
+  skip "artifact sync (node not found - activate the conda env)"
 fi
 
 # 5. workflow meta validity (required fields, pure literal, phase() matching)
@@ -99,14 +100,14 @@ else
   skip "plugin validate (claude CLI not found)"
 fi
 
-# 8. unit tests (node's built-in runner; skipped until tests exist)
+# 8. unit tests (node's built-in runner over tests/*.test.mjs)
 section "tests"
 if ! command -v node >/dev/null 2>&1; then
   skip "tests (node not found - activate the conda env)"
-elif [ -n "$(find test -name '*.test.mjs' 2>/dev/null)" ]; then
+elif [ -n "$(find tests -name '*.test.mjs' 2>/dev/null)" ]; then
   if node --test; then ok tests; else bad tests; fi
 else
-  skip "tests (none yet)"
+  skip "tests (none found)"
 fi
 
 # summary

@@ -161,15 +161,15 @@ conda activate repo-review
 You edit the modules in **`src/`** - `engine.mjs` (parsing, reconciliation,
 orchestration), `content.mjs` (prompts + tuning tables), and `util.mjs` (pure
 helpers). **`plugins/repo-review/lib/repo-review.js`** is generated from them by
-`scripts/build-cc.mjs` (the Claude Code runtime blocks `import`, so the shipped
-file must be self-contained). After editing, rebuild:
+`adapters/claude/build.mjs` (the Claude Code runtime blocks `import`, so the
+shipped file must be self-contained). After editing, rebuild:
 
 ```
-node scripts/build-cc.mjs
+node adapters/claude/build.mjs
 ```
 
 Enable the pre-commit hook once per clone so the artifact is rebuilt and staged
-automatically on commit (CI also verifies it with `build-cc.mjs --check`):
+automatically on commit (CI also verifies it with `build.mjs --check`):
 
 ```
 git config core.hooksPath .githooks

@@ -1,7 +1,7 @@
 // repo-review engine: argument parsing, profile resolution, score
 // reconciliation, schema building, and the sequential orchestration loop. the
 // prompt text and tuning tables live in content.mjs, pure helpers in util.mjs.
-// scripts/build-cc.mjs inlines all three into the repo-review.js artifact
+// adapters/claude/build.mjs inlines all three into the repo-review.js artifact
 import { repoSlug } from './util.mjs'
 import {
   PROFILES, DEFAULT_PROFILE, LENSES,
