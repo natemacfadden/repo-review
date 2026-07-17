@@ -5,8 +5,8 @@ import { resolveProfile } from '../src/engine.mjs'
 import { describeFlavor } from '../src/content.mjs'
 import { repoSlug, repoOutDir } from '../src/util.mjs'
 
-// We drive run() with a fake host that records each prompt (no model calls),
-// and compute what each prompt SHOULD contain from the same helpers the engine
+// we drive run() with a fake host that records each prompt (no model calls),
+// and compute what each prompt should contain from the same helpers the engine
 // uses - rather than hardcoding magic strings.
 
 const LENS_KEYS = [

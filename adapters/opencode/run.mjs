@@ -89,10 +89,10 @@ const host = {
   },
 }
 
-// Stand in for the Claude Code command: supply --out/--stamp/--date if absent.
-// Pure - given the args, the current time (ISO string), and the default out
+// stand in for the Claude Code command: supply --out/--stamp/--date if absent.
+// pure - given the args, the current time (ISO string), and the default out
 // base, it returns the augmented args plus the resolved out base and stamp; the
-// caller records those. Time is injected so the result is a function of inputs.
+// caller records those.
 function doorman(argstr, nowIso, defaultOutBase) {
   const auto = nowIso.replace(/[-:]/g, '').replace(/\.\d+/, '') // 20260716T030452Z
   const date = nowIso.slice(0, 10) // 2026-07-16
@@ -113,7 +113,7 @@ function repoPathFromLabel(label) {
   return parts[0] === 'review' ? parts.slice(1, -1).join(':') : parts.slice(1).join(':')
 }
 
-// Size of the committed code, so cost can later be modeled against it. Counts
+// size of the committed code, so cost can later be modeled against it. counts
 // git-tracked files; lines/bytes over text files (binaries and >1 MB skipped).
 function repoSize(path) {
   const r = spawnSync('git', ['-C', path, 'ls-files'],
@@ -138,7 +138,7 @@ function repoSize(path) {
   return { files: files.length, textFiles: counted, lines, bytes }
 }
 
-// Write per-repo metrics.json (per-lens + totals) into each review dir.
+// write per-repo metrics.json (per-lens + totals) into each review dir.
 function writeMetrics() {
   const byRepo = new Map()
   for (const m of metrics) {
@@ -167,7 +167,7 @@ function writeMetrics() {
   }
 }
 
-// Re-quote argv tokens with spaces so a multi-word value (e.g. --for "a b c")
+// re-quote argv tokens with spaces so a multi-word value (e.g. --for "a b c")
 // survives being rejoined and re-tokenized by the engine.
 function quoteArgs(argv) {
   return argv.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')
@@ -175,7 +175,7 @@ function quoteArgs(argv) {
 
 export { doorman, quoteArgs, repoPathFromLabel }
 
-// Only run a review when invoked directly (not when imported by a test).
+// only run a review when invoked directly (not when imported by a test).
 if (import.meta.url === pathToFileURL(process.argv[1] || '.').href) {
   const d = doorman(quoteArgs(process.argv.slice(2)), new Date().toISOString(), outBase)
   outBase = d.outBase

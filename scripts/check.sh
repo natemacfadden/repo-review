@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # repo-review dev/CI checks - the single entry point run both locally and in CI.
-# Runs every check, COLLECTING failures instead of halting on the first, prints
+# Runs every check, collecting failures instead of halting on the first, prints
 # per-check diagnostics, and exits non-zero if any failed. Tools that aren't
 # installed are skipped (not failed) so a partial local env still reports.
 #
-# deliberately NOT `set -e` - we want every check to run
+# deliberately not `set -e` - we want every check to run
 set -uo pipefail
 shopt -s nullglob
 cd "$(dirname "$0")/.."

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // peek - trust-free live view of a repo-review workflow run.
 //
-// renders each worker's recent activity from the HARNESS-written transcripts
+// renders each worker's recent activity from the harness-written transcripts
 // (.../subagents/workflows/<run-id>/agent-*.jsonl). the harness appends every
 // tool call the moment it is made, so this view cannot be skipped, delayed,
 // or faked by the model. worker identity comes from each transcript's
 // opening prompt, which the deterministic engine authored, so the labels
-// are trust-free too. this is the run's ONLY status channel by design:
+// are trust-free too. this is the run's only status channel by design:
 // model-written progress files were tried and removed after workers
 // skipped them or fabricated their timestamps.
 //
@@ -61,7 +61,7 @@ function lastActivity(run) {
 // journal.jsonl is engine-written: "started" lines give trustworthy spawn
 // order, and any later line for the same agentId marks it finished. the
 // `key` on a started line identifies the agent() call it serves - two
-// starts sharing a key are the engine RETRYING one call after a stall,
+// starts sharing a key are the engine retrying one call after a stall,
 // not two different workers.
 function readJournal(run) {
   const started = []
@@ -103,7 +103,7 @@ function readAgent(path) {
           .filter(c => c && c.type === 'text').map(c => c.text).join('\n')
     if (!prompt && msg.role === 'user') prompt = bodyText
     // an interrupt (stall watchdog or a manual esc) lands as a final
-    // user-role "[Request interrupted..." message; only the LAST entry
+    // user-role "[Request interrupted..." message; only the last entry
     // counts, so this flag is re-cleared by any later activity
     killed = msg.role === 'user' && /\[Request interrupted/.test(bodyText)
     for (const c of Array.isArray(content) ? content : []) {

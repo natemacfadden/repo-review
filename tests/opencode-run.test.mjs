@@ -4,7 +4,7 @@ import {
   doorman, quoteArgs, repoPathFromLabel,
 } from '../adapters/opencode/run.mjs'
 
-// Importing run.mjs is now side-effect-free: its bottom-of-file execution is
+// importing run.mjs is side-effect-free: its bottom-of-file execution is
 // behind a "run only when invoked directly" guard, so these helpers can be
 // tested in isolation.
 

@@ -99,7 +99,7 @@ const ALL_AXES = [
 const NON_OWNERS = ['correctness', 'engineering', 'taste', 'documentation']
 
 test('reconcile: weighting is inert when no review owns the axis (== mean)', () => {
-  // property: on a lens-owned axis with NO owning review present, the result is
+  // property: on a lens-owned axis with no owning review present, the result is
   // exactly the plain mean (the 2x weight has nobody to apply to).
   const rnd = mulberry32(12345)
   const axis = 'performance' // lens-owned, but no review below has that lens

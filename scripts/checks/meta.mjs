@@ -1,4 +1,4 @@
-// static validity check for workflow `meta` blocks. parses text - does NOT
+// static validity check for workflow `meta` blocks. parses text - does not
 // import (the module may throw at load) - and asserts:
 //   - `export const meta = { ... }` exists
 //   - meta has `name` and `description`

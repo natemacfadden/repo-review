@@ -2,9 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { run } from '../src/engine.mjs'
 
-// A fake host records every spawn and returns canned structured output, so the
+// a fake host records every spawn and returns canned structured output, so the
 // entire orchestration recipe (detect -> five lenses -> reconcile -> synth) is
-// exercised with zero model calls. This is the seam the host injection buys us.
+// exercised with zero model calls.
 function makeHost({ flavor = null } = {}) {
   const calls = []
   const logs = []

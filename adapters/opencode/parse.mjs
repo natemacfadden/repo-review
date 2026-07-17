@@ -1,4 +1,4 @@
-// Turn an `opencode run --format json` event stream into the pieces the
+// turn an `opencode run --format json` event stream into the pieces the
 // adapter needs: assistant text, a structured object, and any reasoning.
 
 function partsOfType(jsonl, type) {
@@ -19,11 +19,11 @@ function partsOfType(jsonl, type) {
 
 export const extractText = (jsonl) => partsOfType(jsonl, 'text').join('')
 
-// Reasoning parts, when the model/provider emits them (many do not).
+// reasoning parts, when the model/provider emits them (many do not).
 export const extractReasoning = (jsonl) =>
   partsOfType(jsonl, 'reasoning').join('\n')
 
-// Sum token usage and cost across the stream's step-finish events.
+// sum token usage and cost across the stream's step-finish events.
 export function extractUsage(jsonl) {
   const u = {
     input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0,
@@ -53,7 +53,7 @@ export function extractUsage(jsonl) {
   return u
 }
 
-// The last valid ```json fence, else the last {...} span, else null.
+// the last valid ```json fence, else the last {...} span, else null.
 export function extractJson(text) {
   const s = String(text || '')
   let cands = [...s.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)].map(m => m[1])
