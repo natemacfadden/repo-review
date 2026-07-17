@@ -34,7 +34,7 @@ json_ok=1
 for f in \
   .claude-plugin/marketplace.json \
   plugins/repo-review/.claude-plugin/plugin.json; do
-  if python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"; then
+  if node -e "JSON.parse(require('fs').readFileSync(process.argv[1]))" "$f"; then
     printf '  ok   %s\n' "$f"
   else
     printf '  bad  %s\n' "$f"; json_ok=0
@@ -81,7 +81,7 @@ fi
 # version reliably identifies which build ran
 section "version sync"
 ev=$(grep -oE "VERSION = '[^']+'" plugins/repo-review/lib/repo-review.js | head -1 | grep -oE "[0-9][^']*")
-pv=$(python3 -c "import json; print(json.load(open('plugins/repo-review/.claude-plugin/plugin.json'))['version'])" 2>/dev/null)
+pv=$(node -pe "require('./plugins/repo-review/.claude-plugin/plugin.json').version" 2>/dev/null)
 if [ -n "$ev" ] && [ "$ev" = "$pv" ]; then
   ok "version sync ($ev)"
 else

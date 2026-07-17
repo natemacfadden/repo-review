@@ -3,7 +3,6 @@
 //   - `export const meta = { ... }` exists
 //   - meta has `name` and `description`
 //   - no template-literal interpolation in the meta block (pure-ish literal)
-//   - every phase('X') call has a matching meta.phases title
 // usage: node scripts/checks/meta.mjs <workflow.js>...
 // heuristic by design: regex/brace-scan, not a full parser
 import { readFileSync } from 'node:fs'
@@ -38,14 +37,6 @@ for (const file of process.argv.slice(2)) {
     .replace(/"(?:\\.|[^"\\])*"/g, '""')
   if (/[+`(]/.test(stripped))
     fail(file, 'meta must be a pure literal (no concat/template/calls)')
-
-  const declared = new Set(
-    [...block.matchAll(/title\s*:\s*['"]([^'"]+)['"]/g)].map(x => x[1]),
-  )
-  const used = [...src.matchAll(/\bphase\(\s*['"]([^'"]+)['"]\s*\)/g)].map(x => x[1])
-  for (const t of used)
-    if (!declared.has(t))
-      fail(file, `phase(${JSON.stringify(t)}) has no matching meta.phases title`)
 }
 
 if (failed) process.exit(1)

@@ -10,6 +10,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, readFileSync, statSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { run } from '../../src/engine.mjs'
+import { repoSlug } from '../../src/util.mjs'
 import {
   extractText, extractReasoning, extractUsage, extractJson, validate,
   schemaInstruction,
@@ -97,10 +98,6 @@ function doorman(argstr, nowIso, defaultOutBase) {
   return { args: a, outBase: base, stamp }
 }
 
-// filesystem-safe repo name, matching the engine's repoSlug.
-const slug = (p) => (String(p).replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'repo')
-  .replace(/[^A-Za-z0-9_.-]/g, '-') || 'repo'
-
 // recover the repo path from a spawn label (review:<path>:<lens>, else X:<path>).
 function repoPathFromLabel(label) {
   const parts = String(label).split(':')
@@ -149,7 +146,7 @@ function writeMetrics() {
         totals.tokens[k] = (totals.tokens[k] || 0) + e.tokens[k]
       }
     }
-    const dir = `${outBase}/${slug(path)}/${runStamp}`
+    const dir = `${outBase}/${repoSlug(path)}/${runStamp}`
     mkdirSync(dir, { recursive: true })
     const payload = {
       repo: path, model: MODEL, stamp: runStamp,
@@ -167,7 +164,7 @@ function quoteArgs(argv) {
   return argv.map(a => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')
 }
 
-export { doorman, quoteArgs, repoPathFromLabel, slug }
+export { doorman, quoteArgs, repoPathFromLabel }
 
 // Only run a review when invoked directly (not when imported by a test).
 if (import.meta.url === pathToFileURL(process.argv[1] || '.').href) {

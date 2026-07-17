@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  doorman, quoteArgs, repoPathFromLabel, slug,
+  doorman, quoteArgs, repoPathFromLabel,
 } from '../adapters/opencode/run.mjs'
 
 // Importing run.mjs is now side-effect-free: its bottom-of-file execution is
@@ -66,15 +66,4 @@ test('repoPathFromLabel: non-review labels keep all after the prefix', () => {
 test('repoPathFromLabel: paths containing colons are rejoined', () => {
   assert.equal(repoPathFromLabel('review:C:/repos/foo:taste'), 'C:/repos/foo')
   assert.equal(repoPathFromLabel('detect:C:/repos/foo'), 'C:/repos/foo')
-})
-
-// slug
-// ----
-
-test('slug: filesystem-safe last path segment, matching the engine', () => {
-  assert.equal(slug('/repos/foo'), 'foo')
-  assert.equal(slug('/repos/foo/'), 'foo')
-  assert.equal(slug('a/b/my repo!'), 'my-repo-')
-  assert.equal(slug(''), 'repo')
-  assert.equal(slug('/'), 'repo')
 })

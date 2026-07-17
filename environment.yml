@@ -7,6 +7,6 @@ name: repo-review
 channels:
   - conda-forge
 dependencies:
+  # node is the only prerequisite; the checkers and tests are self-contained
+  # (no npm deps, no python)
   - nodejs>=20
-  # future conda-provided tooling goes here (e.g. python for offline manifest
-  # schema validation); JS dev tooling stays self-contained in scripts/ (no deps)
