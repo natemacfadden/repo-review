@@ -1,21 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { loadPure } from './extract.mjs'
-
-const WF = 'plugins/repo-review/lib/repo-review.js'
-const {
-  splitRepoToken, parseArgs, normalizeArgs, describeArgs, USAGE, repoSlug,
-  repoOutDir, findSlugCollisions,
-} = loadPure(WF, [
-  'splitRepoToken',
-  'parseArgs',
-  'normalizeArgs',
-  'describeArgs',
-  'USAGE',
-  'repoSlug',
-  'repoOutDir',
-  'findSlugCollisions',
-])
+import {
+  splitRepoToken, parseArgs, normalizeArgs, describeArgs, USAGE,
+  findSlugCollisions,
+} from '../plugins/repo-review/lib/engine.mjs'
+import { repoSlug, repoOutDir } from '../plugins/repo-review/lib/util.mjs'
 
 test('repoSlug: takes the last path segment, sanitized', () => {
   assert.equal(repoSlug('./my-repo'), 'my-repo')

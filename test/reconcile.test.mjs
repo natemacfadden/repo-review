@@ -1,9 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { loadPure } from './extract.mjs'
-
-const WF = 'plugins/repo-review/lib/repo-review.js'
-const { reconcileScores } = loadPure(WF, ['reconcileScores'])
+import { reconcileScores } from '../plugins/repo-review/lib/engine.mjs'
 
 const reviews = [
   {

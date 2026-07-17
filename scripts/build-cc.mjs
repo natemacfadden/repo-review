@@ -1,20 +1,22 @@
-// Generate the Claude Code workflow artifact (lib/repo-review.js) from the
-// authored engine (lib/engine.mjs). The CC Workflow runtime blocks import(),
-// so the shipped file must be self-contained: we inline the engine, drop the
-// `run` export, and append a launcher that wires the runtime globals
-// (agent/log) into the injected host. engine.mjs stays the single source of
-// truth; repo-review.js is generated - do not edit it by hand.
+// generate the Claude Code workflow artifact (repo-review.js) from the authored
+// modules (util + content + engine.mjs). the Claude Code runtime blocks
+// import(), so the shipped file is self-contained: inline the three in
+// dependency order, strip their imports and `export { }` blocks (keep
+// `export const meta`, which the runtime extracts), and append a launcher
+// wiring agent/log into the host. the .mjs files are the source of truth;
+// repo-review.js is generated - do not hand-edit
 //
 // usage: node scripts/build-cc.mjs          # write the artifact
 //        node scripts/build-cc.mjs --check   # verify it is up to date (CI)
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const ROOT = new URL('../plugins/repo-review/lib/', import.meta.url)
-const ENGINE = new URL('engine.mjs', ROOT)
+const MODULES = ['util.mjs', 'content.mjs', 'engine.mjs'] // dependency order
 const ARTIFACT = new URL('repo-review.js', ROOT)
 
 const BANNER =
-  '// Generated from engine.mjs by scripts/build-cc.mjs - edit engine.mjs.\n'
+  '// generated from util/content/engine.mjs by scripts/build-cc.mjs\n' +
+  '// do not edit by hand - edit the .mjs sources\n'
 
 const LAUNCHER =
   '\n// Claude Code launcher: wire the runtime globals into the injected host.\n' +
@@ -24,15 +26,20 @@ const LAUNCHER =
   '}\n' +
   'return run(__host, args)\n'
 
+// strip a module down to inlinable source: drop intra-package import statements
+// and `export { ... }` re-export blocks (single- or multi-line), while keeping
+// `export const meta` (the runtime extracts it statically).
+function strip(src) {
+  return src
+    .replace(/^import\b[\s\S]*?from\s*'\.[^']*'[^\n]*\n/gm, '')
+    .replace(/^export\s*\{[\s\S]*?\}[^\n]*\n/gm, '')
+}
+
 function build() {
-  const engine = readFileSync(ENGINE, 'utf8')
-  // drop only the `run` export; `export const meta` must stay for the runtime
-  // to statically extract it.
-  const inlined = engine.replace(
-    /export async function run\(/,
-    'async function run(',
+  const parts = MODULES.map(
+    name => strip(readFileSync(new URL(name, ROOT), 'utf8')).trimEnd(),
   )
-  return BANNER + inlined + LAUNCHER
+  return BANNER + parts.join('\n\n') + '\n' + LAUNCHER
 }
 
 const generated = build()

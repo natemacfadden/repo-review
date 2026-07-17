@@ -1,16 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { run } from '../plugins/repo-review/lib/engine.mjs'
-import { loadPure } from './extract.mjs'
+import { resolveProfile } from '../plugins/repo-review/lib/engine.mjs'
+import { describeFlavor } from '../plugins/repo-review/lib/content.mjs'
+import { repoSlug, repoOutDir } from '../plugins/repo-review/lib/util.mjs'
 
-// The prompt builders live outside the extractable "pure" region, so we can't
-// pull them out directly. Instead we drive run() with a fake host that just
-// records each prompt (no model calls), and we pull the deterministic helpers
-// out of the shipped workflow to compute what each prompt SHOULD contain -
-// rather than hardcoding magic strings.
-const WF = 'plugins/repo-review/lib/repo-review.js'
-const { resolveProfile, describeFlavor, repoSlug, repoOutDir } =
-  loadPure(WF, ['resolveProfile', 'describeFlavor', 'repoSlug', 'repoOutDir'])
+// We drive run() with a fake host that records each prompt (no model calls),
+// and compute what each prompt SHOULD contain from the same helpers the engine
+// uses - rather than hardcoding magic strings.
 
 const LENS_KEYS = [
   'performance', 'correctness', 'engineering', 'taste', 'documentation',

@@ -1,12 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { loadPure } from './extract.mjs'
-
-const WF = 'plugins/repo-review/lib/repo-review.js'
-const { describeFlavor, KNOWN_FLAVORS } = loadPure(WF, [
-  'describeFlavor',
-  'KNOWN_FLAVORS',
-])
+import { describeFlavor } from '../plugins/repo-review/lib/content.mjs'
+import { KNOWN_FLAVORS } from '../plugins/repo-review/lib/engine.mjs'
 
 test('describeFlavor: every known flavor has its own distinct guidance', () => {
   const balanced = describeFlavor(null)
