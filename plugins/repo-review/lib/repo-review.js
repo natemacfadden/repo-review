@@ -330,6 +330,10 @@ function reviewPrompt(repo, lens, profile, flavor, outBase, stamp, date) {
       'memory (e.g. free -m). If memory is tight or an op risks an OOM ' +
       'kill, downgrade that step to a read-only assessment and say so - ' +
       'never risk OOM.',
+    'CONTEXT DISCIPLINE: keep the working context lean - do NOT paste whole ' +
+      'files or long command output into the conversation; sample, summarize, ' +
+      'and truncate. prefer targeted reads over dumping or re-reading; a ' +
+      'bloated context forces a mid-review summary that can drop this lens.',
     'TIME DISCIPLINE: every command gets an explicit, SMALL time limit - ' +
       'default 120 seconds (Bash tool timeout, or prefix `timeout 120`). ' +
       'Raising a bound must be deliberate: first prove the step at smoke ' +
