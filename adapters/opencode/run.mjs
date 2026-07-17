@@ -35,7 +35,8 @@ function opencodeRun(prompt) {
     child.on('error', reject)
     child.on('close', code => code === 0
       ? resolve(out)
-      : reject(new Error(`opencode run exited ${code}: ${err.slice(-400)}`)))
+      : reject(new Error(`opencode run exited ${code}: ` +
+          `${(err.trim() || out).slice(-600)}`)))
   })
 }
 
