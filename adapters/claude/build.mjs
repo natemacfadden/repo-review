@@ -1,10 +1,17 @@
 // generate the Claude Code workflow artifact (repo-review.js) from the authored
 // modules (util + content + engine.mjs). the Claude Code runtime blocks
 // import(), so the shipped file is self-contained: inline the three in
-// dependency order, strip their imports and `export { }` blocks (keep
-// `export const meta`, which the runtime extracts), and append a launcher
-// wiring agent/log into the host. the .mjs files are the source of truth;
+// dependency order, strip their imports and `export { }` blocks, hoist
+// `export const meta` ahead of all code, and append a launcher wiring
+// agent/log into the host. the .mjs files are the source of truth;
 // repo-review.js is generated - do not hand-edit
+//
+// why hoist meta: the workflow runtime requires `export const meta` to be the
+// FIRST STATEMENT of the script and rejects the whole file otherwise. meta is
+// authored inside engine.mjs (where it belongs, beside the phases it names),
+// but engine.mjs is inlined last, so in the concatenation it would sit behind
+// util.mjs's and content.mjs's declarations. comments are not statements, so
+// the banner may stay on top. scripts/checks/meta.mjs enforces the invariant
 //
 // usage: node adapters/claude/build.mjs          # write the artifact
 //        node adapters/claude/build.mjs --check   # verify it is up to date (CI)
@@ -36,11 +43,37 @@ function strip(src) {
     .replace(/^export\s*\{[\s\S]*?\}[^\n]*\n/gm, '')
 }
 
+// span of the `export const meta = { ... }` declaration in src, as [start, end)
+// with end just past the closing brace. brace-scan, like scripts/checks/meta.mjs
+// (meta is a pure literal by contract, so no strings can hide a brace).
+function metaSpan(src) {
+  const m = src.match(/^export\s+const\s+meta\s*=\s*\{/m)
+  if (!m) throw new Error('build: no `export const meta = {...}` in the sources')
+  const open = m.index + m[0].length - 1
+  let depth = 0
+  for (let j = open; j < src.length; j++) {
+    if (src[j] === '{') depth++
+    else if (src[j] === '}' && --depth === 0) return [m.index, j + 1]
+  }
+  throw new Error('build: unterminated `export const meta` block')
+}
+
+// move the meta declaration to the front of the body, so it precedes every
+// statement in the artifact (see the header note on why the runtime demands it)
+function hoistMeta(body) {
+  const [start, end] = metaSpan(body)
+  const block = body.slice(start, end)
+  const rest = (body.slice(0, start) + body.slice(end))
+    .replace(/\n{3,}/g, '\n\n')
+    .trimStart()
+  return `${block}\n\n${rest}`
+}
+
 function build() {
   const parts = MODULES.map(
     name => strip(readFileSync(new URL(name, SRC), 'utf8')).trimEnd(),
   )
-  return BANNER + parts.join('\n\n') + '\n' + LAUNCHER
+  return BANNER + hoistMeta(parts.join('\n\n')) + '\n' + LAUNCHER
 }
 
 const generated = build()

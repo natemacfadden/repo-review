@@ -1,5 +1,18 @@
 // generated from util/content/engine.mjs by adapters/claude/build.mjs
 // do not edit by hand - edit the .mjs sources
+export const meta = {
+  name: 'repo-review',
+  description:
+    'Clone, build, run, and review repos across five lenses; synthesize.',
+  whenToUse:
+    'Stand repos up and review them; args: repos and --profile/--for/--out.',
+  phases: [
+    { title: 'Detect', detail: 'per-repo flavor detection (when not given)' },
+    { title: 'Reviews', detail: 'five lens reviewers per repo, one at a time' },
+    { title: 'Synthesis', detail: 'reconcile (code) + write the memo' },
+  ],
+}
+
 // pure path helpers shared by the engine and prompt builders. no deps, no
 // side effects - safe to import anywhere
 
@@ -452,19 +465,6 @@ function synthesisPrompt(repo, profile, flavor, reviews, scores, outBase, stamp,
 // reconciliation, schema building, and the sequential orchestration loop. the
 // prompt text and tuning tables live in content.mjs, pure helpers in util.mjs.
 // adapters/claude/build.mjs inlines all three into the repo-review.js artifact
-
-export const meta = {
-  name: 'repo-review',
-  description:
-    'Clone, build, run, and review repos across five lenses; synthesize.',
-  whenToUse:
-    'Stand repos up and review them; args: repos and --profile/--for/--out.',
-  phases: [
-    { title: 'Detect', detail: 'per-repo flavor detection (when not given)' },
-    { title: 'Reviews', detail: 'five lens reviewers per repo, one at a time' },
-    { title: 'Synthesis', detail: 'reconcile (code) + write the memo' },
-  ],
-}
 
 // plugin version - bump on every behavior change and keep in sync with
 // .claude-plugin/plugin.json (check.sh enforces the match). printed at the
